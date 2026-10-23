@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --alto-red: #cb4b3b;
+  --alto-charcoal: #252525;
+  --alto-sand: #dcdacf;
+  --alto-sand-light: #f4f3ee;
+  --font-montserrat: "Gotham", "Montserrat", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #dcdacf;
+  color: #252525;
+  font-family: var(--font-montserrat);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Brand accent color for native radio and checkbox controls */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: #cb4b3b;
+}
+
+/* Minimum 48px tap targets and 1rem font size to prevent mobile auto-zoom */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  font-size: 1rem;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select {
+    min-height: 52px;
+  }
+}
+
+/* High-contrast accessible focus ring */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #cb4b3b;
+  outline-offset: 2px;
+}
+
+/* Validate input after user interaction (:user-invalid & fallback) */
+.field-error-msg {
+  display: none;
+  color: #a93829;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+input:user-invalid,
+textarea:user-invalid,
+select:user-invalid,
+input.user-invalid-fallback,
+textarea.user-invalid-fallback,
+select.user-invalid-fallback {
+  border-color: #cb4b3b !important;
+  background-color: #f9eae8 !important;
+}
+
+input:user-invalid ~ .field-error-msg,
+textarea:user-invalid ~ .field-error-msg,
+select:user-invalid ~ .field-error-msg,
+input.user-invalid-fallback ~ .field-error-msg,
+textarea.user-invalid-fallback ~ .field-error-msg,
+select.user-invalid-fallback ~ .field-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+input:user-valid:not([type="radio"]):not([type="checkbox"]),
+textarea:user-valid {
+  border-color: #1f6f43;
+}
+
+/* Native dialog backdrop */
+dialog::backdrop {
+  background-color: rgba(37, 37, 37, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+/* Ocultar barra de rolagem (Chrome, Safari, Edge, Firefox) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+  height: 0px;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
