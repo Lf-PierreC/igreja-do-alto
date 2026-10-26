@@ -9,20 +9,25 @@ import {
 import { INITIAL_DATA } from "@/data/initialData";
 
 export function getSupabaseClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = (
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )?.trim();
 
   if (
-    !url ||
+    !rawUrl ||
     !key ||
-    url.includes("SEU-PROJETO") ||
+    rawUrl.includes("SEU-PROJETO") ||
     key.includes("SUA-CHAVE")
   ) {
     return null;
   }
+
+  // Se o usuário colar com "/rest/v1/" no final, removemos automaticamente
+  const url = rawUrl.replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
 
   return createClient(url, key, {
     auth: { persistSession: false },
