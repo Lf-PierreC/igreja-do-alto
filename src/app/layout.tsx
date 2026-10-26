@@ -6,6 +6,21 @@ export const metadata: Metadata = {
   title: "Igreja do Alto | Cuidado & Visitação Pastoral",
   description:
     "Sistema de Visitas Pastorais da Igreja do Alto — Lugar de Proteção, Provisão e Direção.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      {
+        url: "/brand/logotipo igreja do alto verotizado_montanha vermelha.png",
+        type: "image/png",
+      },
+    ],
+    apple: [
+      {
+        url: "/brand/logotipo igreja do alto verotizado_montanha vermelha.png",
+        type: "image/png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
