@@ -43,7 +43,7 @@ export const INITIAL_DATA: DatabaseSchema = {
       householdSize: 3,
       familyInChurch: "Cláudia Nascimento (esposa) e Pedro Nascimento (filho)",
       relationship: "Membro",
-      attendanceTime: "Mais de 3 anos",
+      attendanceTime: "3 a 5 anos",
       participatesInActivity: true,
       activityName: "Casa do Alto Montanha da Fé",
       address: {
@@ -140,7 +140,7 @@ export const INITIAL_DATA: DatabaseSchema = {
       householdSize: 1,
       familyInChurch: "Sobrinha Carla frequenta aos domingos à noite.",
       relationship: "Membro",
-      attendanceTime: "Mais de 3 anos",
+      attendanceTime: "3 a 5 anos",
       participatesInActivity: false,
       address: {
         street: "Rua Vieira de Morais",
@@ -230,7 +230,7 @@ export const INITIAL_DATA: DatabaseSchema = {
       householdSize: 2,
       familyInChurch: "Sônia e filho Matheus (atualmente afastado)",
       relationship: "Estou afastado(a)",
-      attendanceTime: "Mais de 3 anos",
+      attendanceTime: "3 a 5 anos",
       participatesInActivity: false,
       address: {
         street: "Av. Atlântica",
@@ -290,7 +290,7 @@ export const INITIAL_DATA: DatabaseSchema = {
       householdSize: 2,
       familyInChurch: "Joaquim e esposa Marta",
       relationship: "Membro",
-      attendanceTime: "Mais de 3 anos",
+      attendanceTime: "3 a 5 anos",
       participatesInActivity: true,
       activityName: "Homens do Alto",
       address: {
@@ -326,7 +326,7 @@ export const INITIAL_DATA: DatabaseSchema = {
         neighborhood: "Socorro",
         city: "São Paulo",
       },
-      preferredDays: ["Terça-feira", "Quinta-feira", "Sábado"],
+      preferredDays: ["Terça-feira", "Sábado"],
       preferredShifts: ["Tarde"],
       observations:
         "Esposa Marta entrou em contato pedindo visita e oração pela recuperação pulmonar do Sr. Joaquim.",

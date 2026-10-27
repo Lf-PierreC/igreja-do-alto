@@ -30,7 +30,10 @@ import {
   MapPin,
   Clock,
   ArrowUpRight,
-  ArrowLeft
+  ArrowLeft,
+  Lock,
+  LogOut,
+  AlertCircle,
 } from "lucide-react";
 
 type ActiveTab =
@@ -40,7 +43,19 @@ type ActiveTab =
   | "pessoas"
   | "solicitacoes";
 
+const ADMIN_STORAGE_KEY = "igreja_alto_admin_auth";
+const EXPECTED_ADMIN_USER =
+  process.env.NEXT_PUBLIC_ADMIN_USER?.trim() || "admin";
+const EXPECTED_ADMIN_PASS =
+  process.env.NEXT_PUBLIC_ADMIN_PASS?.trim() || "igrejadoalto";
+
 export default function PainelLideresPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [loginUser, setLoginUser] = useState<string>("");
+  const [loginPass, setLoginPass] = useState<string>("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   const [db, setDb] = useState<DatabaseSchema>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(
@@ -54,6 +69,17 @@ export default function PainelLideresPage() {
   const [modalReport, setModalReport] = useState<VisitReport | null>(null);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(ADMIN_STORAGE_KEY);
+      if (saved === "authenticated") {
+        setIsAuthenticated(true);
+      }
+    } catch {
+      // ignore storage errors
+    } finally {
+      setAuthChecked(true);
+    }
+
     fetch("/api/dados")
       .then((res) => res.json())
       .then((data: DatabaseSchema) => {
@@ -65,6 +91,35 @@ export default function PainelLideresPage() {
         // Fallback to INITIAL_DATA if offline
       });
   }, []);
+
+  const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoginError(null);
+
+    if (
+      loginUser.trim().toLowerCase() === EXPECTED_ADMIN_USER.toLowerCase() &&
+      loginPass === EXPECTED_ADMIN_PASS
+    ) {
+      setIsAuthenticated(true);
+      try {
+        window.localStorage.setItem(ADMIN_STORAGE_KEY, "authenticated");
+      } catch {
+        // ignore
+      }
+    } else {
+      setLoginError("Usuário ou senha inválidos. Verifique suas credenciais.");
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAuthenticated(false);
+    setLoginPass("");
+    try {
+      window.localStorage.removeItem(ADMIN_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  };
 
   const handleSelectMemberForHistory = (memberId: string) => {
     setSelectedMemberId(memberId);
@@ -97,6 +152,106 @@ export default function PainelLideresPage() {
     (r) => r.status === "pendente" || r.status === "agendada"
   ).length;
 
+  if (!authChecked) {
+    return <div className="min-h-screen bg-[#DCDACF]" />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#DCDACF] text-[#252525]">
+        <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+            <Link href="/" aria-label="Voltar para a página inicial">
+              <BrandLogo variant="on-dark2" size="sm" showTagline />
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Início
+            </Link>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-md rounded-3xl bg-[#F4F3EE] border-2 border-[#252525] shadow-2xl overflow-hidden">
+            <div className="bg-[#252525] text-[#DCDACF] px-6 py-6 border-b-4 border-[#CB4B3B] flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#CB4B3B] text-[#DCDACF] flex items-center justify-center shrink-0 shadow">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#CB4B3B]">
+                  Acesso Restrito
+                </span>
+                <h1 className="text-lg sm:text-xl font-black uppercase tracking-tight">
+                  Administração Pastoral
+                </h1>
+              </div>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="p-6 sm:p-8 space-y-5">
+              {loginError && (
+                <div
+                  role="alert"
+                  className="p-3.5 rounded-2xl bg-[#F9EAE8] border-2 border-[#CB4B3B] text-[#A93829] flex items-start gap-2.5 text-xs font-bold"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="admin-user"
+                  className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
+                >
+                  Usuário Administrador
+                </label>
+                <input
+                  id="admin-user"
+                  type="text"
+                  required
+                  autoComplete="username"
+                  value={loginUser}
+                  onChange={(e) => setLoginUser(e.target.value)}
+                  placeholder="Digite o usuário"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 text-sm font-semibold text-[#252525]"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="admin-pass"
+                  className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
+                >
+                  Senha de Acesso
+                </label>
+                <input
+                  id="admin-pass"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={loginPass}
+                  onChange={(e) => setLoginPass(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 text-sm font-semibold text-[#252525]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 px-6 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-colors"
+              >
+                Entrar no Painel Completo
+              </button>
+            </form>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#DCDACF] text-[#252525]">
       {/* Top Navigation Header */}
@@ -109,14 +264,23 @@ export default function PainelLideresPage() {
             <BrandLogo variant="on-dark2" size="sm" showTagline />
           </Link>
 
-          <div className="flex items-center gap-2.5">
-           <Link
+          <div className="flex items-center gap-2">
+            <Link
               href="/"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Início
             </Link>
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
+              title="Encerrar sessão administrativa"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
           </div>
         </div>
 

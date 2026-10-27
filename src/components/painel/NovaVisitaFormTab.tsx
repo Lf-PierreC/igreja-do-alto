@@ -70,7 +70,8 @@ export function NovaVisitaFormTab({
   const [newMemberAddress, setNewMemberAddress] = useState("");
 
   const [visitDate, setVisitDate] = useState<string>(todayISO());
-  const [approxTime, setApproxTime] = useState<string>();
+  const [startTime, setStartTime] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("");
   const [visitors, setVisitors] = useState<string[]>([
     db.pastors[0]?.name || "Pr. Marcos Oliveira",
   ]);
@@ -267,6 +268,15 @@ export function NovaVisitaFormTab({
       return;
     }
 
+    const formattedApproxTime =
+      startTime && endTime
+        ? `${startTime} às ${endTime}`
+        : startTime
+        ? `Início: ${startTime}`
+        : endTime
+        ? `Término: ${endTime}`
+        : undefined;
+
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/dados", {
@@ -283,7 +293,7 @@ export function NovaVisitaFormTab({
               mode === "new" ? newMemberNeighborhood : undefined,
             newMemberAddress: mode === "new" ? newMemberAddress : undefined,
             visitDate,
-            approxTime: approxTime || undefined,
+            approxTime: formattedApproxTime,
             visitors: finalVisitors,
             othersPresent: othersPresent || undefined,
             visitHappened,
@@ -327,6 +337,8 @@ export function NovaVisitaFormTab({
       setSuccessMessage(
         "Relatório de visita pastoral registrado com sucesso! O prontuário da pessoa/família e o painel de indicadores foram atualizados."
       );
+      setStartTime("");
+      setEndTime("");
       setSummary("");
       setPrayerRequest("");
       setLeadershipNote("");
@@ -741,8 +753,8 @@ export function NovaVisitaFormTab({
               )}
             </div>
 
-            {/* Data da visita * & Horário aproximado */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Data da visita * & Horário aproximado de início e de término */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>
                 <label
                   htmlFor="visit-date"
@@ -763,17 +775,34 @@ export function NovaVisitaFormTab({
 
               <div>
                 <label
-                  htmlFor="approx-time"
+                  htmlFor="start-time"
                   className="block text-sm font-extrabold uppercase tracking-wide text-[#252525] mb-1.5"
                 >
-                  Horário aproximado
+                  Horário aprox. de início
                 </label>
                 <input
                   type="time"
-                  id="approx-time"
-                  name="approxTime"
-                  value={approxTime}
-                  onChange={(e) => setApproxTime(e.target.value)}
+                  id="start-time"
+                  name="startTime"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="end-time"
+                  className="block text-sm font-extrabold uppercase tracking-wide text-[#252525] mb-1.5"
+                >
+                  Horário aprox. de término
+                </label>
+                <input
+                  type="time"
+                  id="end-time"
+                  name="endTime"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
                   className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 font-semibold"
                 />
               </div>

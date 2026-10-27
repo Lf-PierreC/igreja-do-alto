@@ -31,7 +31,8 @@ export const ATTENDANCE_TIME = [
   "3 a 6 meses",
   "6 meses a 1 ano",
   "1 a 3 anos",
-  "Mais de 3 anos",
+  "3 a 5 anos",
+  "Mais de 5 anos",
 ] as const;
 
 export const YES_NO = ["Sim", "Não"] as const;
@@ -62,10 +63,8 @@ export const WEEK_DAYS = [
   "Segunda-feira",
   "Terça-feira",
   "Quarta-feira",
-  "Quinta-feira",
   "Sexta-feira",
   "Sábado",
-  "Domingo",
 ] as const;
 
 export const SHIFTS = ["Manhã", "Tarde", "Noite", "A combinar"] as const;
