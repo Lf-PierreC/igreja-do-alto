@@ -73,7 +73,7 @@ export function NovaVisitaFormTab({
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [visitors, setVisitors] = useState<string[]>([
-    db.pastors[0]?.name || "Pr. Marcos Oliveira",
+    db.pastors[0]?.name || "Prs. Marcos e Mara",
   ]);
   const [otherLeaderName, setOtherLeaderName] = useState<string>("");
   const [showAddVisitorBox, setShowAddVisitorBox] = useState(false);

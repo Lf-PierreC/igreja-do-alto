@@ -150,9 +150,15 @@ create policy "Acesso total na tabela visit_reports"
 -- =============================================================================
 insert into public.pastors (id, name, role, phone, region_focus)
 values
-  ('pas-1', 'Pr. Marcos Vinícius', 'Pastor Sênior', '(11) 99812-4401', 'Zona Sul & Centro'),
-  ('pas-2', 'Pra. Cláudia Ribeiro', 'Pastora de Cuidado Pastoral', '(11) 99744-1092', 'Novos Membros & Visitação'),
-  ('pas-3', 'Pr. André Nogueira', 'Pastor de Famílias & Casais', '(11) 99610-8834', 'Zona Oeste & Famílias'),
-  ('pas-4', 'Pra. Helena Martins', 'Pastora de Intercessão & Hospitalar', '(11) 99521-7740', 'Enfermos & Luto'),
-  ('pas-5', 'Outro líder autorizado', 'Liderança de Casa do Alto / Diaconato', '(11) 99409-3120', 'Apoio Geral')
-on conflict (id) do nothing;
+  ('pas-1', 'Prs. Marcos e Mara', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-2', 'Prs. Rafael e Jelly', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-3', 'Prs. Beto e Sheila', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-4', 'Prs. Wenderson e Paula', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-5', 'Prs. Ademir e Fátima', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-6', 'Prs. Cláudio e Cidinha', 'Pastores', '', 'Igreja do Alto'),
+  ('pas-7', 'Prs. Júlio e Marlen', 'Pastores', '', 'Igreja do Alto')
+on conflict (id) do update set
+  name = excluded.name,
+  role = excluded.role,
+  phone = excluded.phone,
+  region_focus = excluded.region_focus;
