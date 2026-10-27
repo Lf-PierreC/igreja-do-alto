@@ -8,15 +8,16 @@ export const metadata: Metadata = {
     "Sistema de Visitas Pastorais da Igreja do Alto — Lugar de Proteção, Provisão e Direção.",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
       {
-        url: "/favicon.png",
+        url: "/favicon.png?v=3",
         type: "image/png",
       },
+      { url: "/icon.svg?v=3", type: "image/svg+xml" },
     ],
+    shortcut: ["/favicon.png?v=3"],
     apple: [
       {
-        url: "/apple-icon.png",
+        url: "/apple-icon.png?v=3",
         type: "image/png",
       },
     ],

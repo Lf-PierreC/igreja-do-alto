@@ -10,7 +10,6 @@ interface BrandLogoProps {
 export function MountainIcon({
   circleColor = "#CB4B3B",
   mountainColor = "#CB4B3B",
-  skyColor = "#DCDACF",
   size = 44,
   className = "",
 }: {
@@ -20,6 +19,7 @@ export function MountainIcon({
   size?: number;
   className?: string;
 }) {
+  const maskId = React.useId();
   return (
     <svg
       width={size}
@@ -30,24 +30,27 @@ export function MountainIcon({
       className={className}
       aria-hidden="true"
     >
-      {/* Outer solid circle */}
-      <circle cx="50" cy="50" r="48" fill={circleColor} />
-      {/* Inner sky circle */}
-      <circle cx="50" cy="50" r="42" fill={skyColor} />
-      {/* Mountain peaks matching Igreja do Alto vector mark */}
-      <path
-        d="M6 56 L29 29 L63 69 L58 69 L35 41 L51 22 L73 49 L82 38 L94 54 A43 43 0 0 1 6 56 Z"
-        fill={mountainColor}
-      />
-      {/* Base fill of the circle under the mountains */}
-      <path
-        d="M7 55 L29 30 L59 66 L64 66 L36 33 L51 17 L73 44 L82 34 L93 50 A42.5 42.5 0 1 1 7 55 Z"
-        fill={mountainColor}
-      />
-      {/* Diagonal ridge cut line */}
-      <path
-        d="M28 29 L60 67 L64.5 67 L32.5 29 Z"
-        fill={skyColor}
+      <defs>
+        <mask id={maskId}>
+          <rect width="100" height="100" fill="black" />
+          <circle cx="50" cy="50" r="48" fill="white" />
+          <circle cx="50" cy="50" r="42" fill="black" />
+          <path
+            d="M6 56 L29 29 L63 69 L58 69 L35 41 L51 22 L73 49 L82 38 L94 54 A43 43 0 0 1 6 56 Z"
+            fill="white"
+          />
+          <path
+            d="M7 55 L29 30 L59 66 L64 66 L36 33 L51 17 L73 44 L82 34 L93 50 A42.5 42.5 0 1 1 7 55 Z"
+            fill="white"
+          />
+          <path d="M28 29 L60 67 L64.5 67 L32.5 29 Z" fill="black" />
+        </mask>
+      </defs>
+      <rect
+        width="100"
+        height="100"
+        fill={mountainColor || circleColor}
+        mask={`url(#${maskId})`}
       />
     </svg>
   );
