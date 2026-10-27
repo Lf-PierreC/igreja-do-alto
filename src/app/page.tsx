@@ -80,7 +80,7 @@ export default function HomePage() {
             <div className="p-7 sm:p-9">
               <div className="flex items-center justify-between gap-3 mb-6">
                 <span className="px-3.5 py-1.5 rounded-full bg-[#CB4B3B]/15 text-[#CB4B3B] border border-[#CB4B3B]/30 text-xs font-black uppercase tracking-widest">
-                  Link 01 • Membros
+                  Link de Membros
                 </span>
                 <button
                   type="button"
