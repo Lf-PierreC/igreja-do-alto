@@ -10,13 +10,13 @@ export const metadata: Metadata = {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
       {
-        url: "/brand/logotipo igreja do alto verotizado_montanha vermelha.png",
+        url: "/favicon.png",
         type: "image/png",
       },
     ],
     apple: [
       {
-        url: "/brand/logotipo igreja do alto verotizado_montanha vermelha.png",
+        url: "/apple-icon.png",
         type: "image/png",
       },
     ],
