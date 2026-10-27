@@ -472,17 +472,26 @@ export function DashboardTab({
                   key={member.id}
                   className="py-3.5 sm:py-4 first:pt-0 last:pb-0"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 sm:gap-2 mb-1.5">
                     <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => onSelectMemberForHistory(member.id)}
-                        className="text-sm sm:text-base font-black text-[#252525] hover:text-[#CB4B3B] text-left inline-flex items-center gap-1 transition-colors"
-                      >
-                        <span className="truncate">{member.name}</span>
-                        <ArrowUpRight className="w-4 h-4 text-[#CB4B3B] shrink-0" />
-                      </button>
-                      <div className="text-[11px] sm:text-xs font-semibold text-[#252525]/70">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectMemberForHistory(member.id)}
+                          className="max-w-full text-sm sm:text-base font-black text-[#252525] hover:text-[#CB4B3B] text-left inline-flex items-center gap-1 transition-colors"
+                        >
+                          <span className="break-words">{member.name}</span>
+                          <ArrowUpRight className="w-4 h-4 text-[#CB4B3B] shrink-0" />
+                        </button>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider border shrink-0 sm:hidden ${meta.badgeClass}`}
+                        >
+                          {meta.emoji} {meta.shortLabel}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] sm:text-xs font-semibold text-[#252525]/70 mt-0.5">
                         {member.address.neighborhood} • Última:{" "}
                         <strong>{formatDateBR(member.lastVisitDate)}</strong>
                         {member.followUpResponsible
@@ -492,7 +501,7 @@ export function DashboardTab({
                     </div>
 
                     <span
-                      className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider border shrink-0 ${meta.badgeClass}`}
+                      className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border shrink-0 ${meta.badgeClass}`}
                     >
                       {meta.emoji} {meta.shortLabel}
                     </span>

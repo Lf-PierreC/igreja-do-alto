@@ -182,16 +182,7 @@ export default function SolicitarVisitaPage() {
       {/* Header */}
       <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-          <Link href="/" aria-label="Voltar para a página inicial">
-            <BrandLogo variant="on-dark2" size="sm" showTagline />
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Início
-          </Link>
+          <BrandLogo variant="on-dark2" size="sm" showTagline />
         </div>
       </header>
 
@@ -247,17 +238,10 @@ export default function SolicitarVisitaPage() {
                   setObservations("");
                   setOtherReasonText("");
                 }}
-                className="px-5 py-3 rounded-xl bg-[#DCDACF] hover:bg-[#C7C4B5] text-[#252525] font-extrabold text-xs uppercase tracking-wider transition-colors"
+                className="px-6 py-3.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs uppercase tracking-wider shadow transition-colors"
               >
-                Nova solicitação
+                Enviar nova solicitação
               </button>
-              <Link
-                href="/painel"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] font-extrabold text-xs uppercase tracking-wider transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                Ir para o Painel de Líderes
-              </Link>
             </div>
           </div>
         ) : (
