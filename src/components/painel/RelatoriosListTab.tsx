@@ -263,13 +263,31 @@ export function RelatoriosListTab({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-4">
-                  <div className="lg:col-span-7">
-                    <div className="text-[11px] font-black uppercase tracking-wider text-[#252525]/60 mb-1">
-                      Como foi a visita ({report.mainReason || "Registro"})
+                  <div className="lg:col-span-7 space-y-3">
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-wider text-[#252525]/60 mb-1">
+                        Como foi a visita ({report.mainReason || "Registro"})
+                      </div>
+                      <p className="text-sm text-[#252525]/90 leading-relaxed font-medium">
+                        {report.summary || report.visitHappened}
+                      </p>
                     </div>
-                    <p className="text-sm text-[#252525]/90 leading-relaxed font-medium">
-                      {report.summary || report.visitHappened}
-                    </p>
+                    {report.photoUrl && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenReportModal(report)}
+                          className="group relative inline-block rounded-2xl overflow-hidden border-2 border-[#252525]/15 hover:border-[#CB4B3B] transition-colors shadow-sm"
+                          title="Clique para ampliar a foto da visita"
+                        >
+                          <img
+                            src={report.photoUrl}
+                            alt={`Foto da visita a ${report.memberName}`}
+                            className="h-36 sm:h-44 w-auto max-w-full object-cover"
+                          />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="lg:col-span-5 bg-[#DCDACF]/65 rounded-2xl p-4 border-l-4 border-[#CB4B3B] space-y-1.5 text-xs">

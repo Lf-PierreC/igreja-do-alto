@@ -40,6 +40,8 @@ import {
   Plus,
   Search,
   X,
+  Camera,
+  Trash2,
 } from "lucide-react";
 
 interface NovaVisitaFormTabProps {
@@ -97,6 +99,8 @@ export function NovaVisitaFormTab({
 
   // 4. Registro pastoral
   const [summary, setSummary] = useState<string>("");
+  const [photoUrl, setPhotoUrl] = useState<string>("");
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
   const [hasPrayerRequest, setHasPrayerRequest] = useState<"Não" | "Sim">(
   );
   const [prayerRequest, setPrayerRequest] = useState<string>("");
@@ -250,6 +254,54 @@ export function NovaVisitaFormTab({
 
   const happened = visitHappened === "Sim";
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX_DIM = 900;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.78);
+          setPhotoUrl(compressedDataUrl);
+        } else {
+          setPhotoUrl(reader.result as string);
+        }
+        setIsCompressingPhoto(false);
+      };
+      img.onerror = () => {
+        setPhotoUrl(reader.result as string);
+        setIsCompressingPhoto(false);
+      };
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => {
+      setIsCompressingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -304,6 +356,7 @@ export function NovaVisitaFormTab({
             inCasaDoAlto: happened ? inCasaDoAlto : undefined,
             inMinistry: happened ? inMinistry : undefined,
             summary: summary || undefined,
+            photoUrl: happened && photoUrl ? photoUrl : undefined,
             hasPrayerRequest: happened ? hasPrayerRequest === "Sim" : false,
             prayerRequest:
               happened && hasPrayerRequest === "Sim"
@@ -340,6 +393,7 @@ export function NovaVisitaFormTab({
       setStartTime("");
       setEndTime("");
       setSummary("");
+      setPhotoUrl("");
       setPrayerRequest("");
       setLeadershipNote("");
       setInternalNotes("");
@@ -1215,6 +1269,61 @@ export function NovaVisitaFormTab({
                     placeholder="Resposta curta ou média sobre como foi a visita..."
                     className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-4 text-[#252525] font-medium"
                   />
+                </div>
+
+                {/* Foto da Visita (Opcional — registrar o momento da visita) */}
+                <div className="space-y-3 rounded-2xl bg-[#DCDACF]/35 p-4 sm:p-5 border border-[#252525]/15">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="block text-sm font-extrabold uppercase tracking-wide text-[#252525]">
+                        Foto da visita (Opcional)
+                      </span>
+                      <span className="block text-xs text-[#252525]/70 mt-0.5">
+                        Anexe uma foto ou tire uma foto na hora para registrar o momento da visita pastoral.
+                      </span>
+                    </div>
+
+                    <label
+                      htmlFor="visit-photo-input"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-extrabold uppercase tracking-wider cursor-pointer transition-colors shadow-sm"
+                    >
+                      <Camera className="w-4 h-4 text-[#CB4B3B] group-hover:text-[#DCDACF]" />
+                      <span>
+                        {isCompressingPhoto
+                          ? "Processando foto..."
+                          : photoUrl
+                          ? "Trocar Foto"
+                          : "Tirar / Escolher Foto"}
+                      </span>
+                      <input
+                        id="visit-photo-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoChange}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
+
+                  {photoUrl && (
+                    <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="relative rounded-2xl overflow-hidden border-2 border-[#CB4B3B] bg-white shadow-md">
+                        <img
+                          src={photoUrl}
+                          alt="Prévia da foto da visita"
+                          className="h-44 sm:h-52 w-auto max-w-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPhotoUrl("")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#F9EAE8] text-[#CB4B3B] border border-[#CB4B3B]/40 text-xs font-extrabold uppercase tracking-wider transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover foto
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Foi identificado algum pedido de oração? + Se sim: Qual? */}

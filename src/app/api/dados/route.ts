@@ -234,6 +234,7 @@ export async function POST(request: Request) {
         inCasaDoAlto?: YesNoUnknown;
         inMinistry?: YesNoUnknown;
         summary?: string;
+        photoUrl?: string;
         hasPrayerRequest?: boolean;
         prayerRequest?: string;
         needsFollowUp?: boolean;
@@ -338,6 +339,7 @@ export async function POST(request: Request) {
         inCasaDoAlto: happened ? p.inCasaDoAlto : undefined,
         inMinistry: happened ? p.inMinistry : undefined,
         summary: p.summary?.trim() || undefined,
+        photoUrl: p.photoUrl || undefined,
         hasPrayerRequest: happened ? p.hasPrayerRequest : undefined,
         prayerRequest:
           happened && p.hasPrayerRequest ? p.prayerRequest?.trim() : undefined,

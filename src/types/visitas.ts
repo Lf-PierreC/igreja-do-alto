@@ -129,6 +129,7 @@ export interface VisitReport {
 
   // Registro pastoral
   summary?: string;
+  photoUrl?: string;
   hasPrayerRequest?: boolean;
   prayerRequest?: string;
   needsFollowUp?: boolean;

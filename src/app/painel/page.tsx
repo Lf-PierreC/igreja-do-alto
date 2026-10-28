@@ -486,6 +486,21 @@ export default function PainelLideresPage() {
               </div>
             )}
 
+            {modalReport.photoUrl && (
+              <div className="p-4 rounded-2xl bg-white border-2 border-[#252525]/15 space-y-2">
+                <div className="text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                  Registro Fotográfico da Visita
+                </div>
+                <div className="rounded-xl overflow-hidden border border-[#252525]/15 bg-[#252525]/5 flex justify-center">
+                  <img
+                    src={modalReport.photoUrl}
+                    alt={`Foto da visita a ${modalReport.memberName}`}
+                    className="max-h-96 w-auto max-w-full object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
             {modalReport.prayerRequest && (
               <div className="p-4 rounded-2xl bg-[#DCDACF] border-l-4 border-[#CB4B3B]">
                 <div className="text-xs font-black uppercase tracking-wider text-[#CB4B3B] mb-1">

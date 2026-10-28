@@ -169,7 +169,16 @@ export function mapRequestToRow(r: VisitRequest) {
   };
 }
 
+const PHOTO_MARKER_REGEX = /\n?\[\[VISIT_PHOTO:(data:image\/[^\]]+|https?:\/\/[^\]]+)\]\]$/;
+
 export function mapRowToReport(row: Record<string, any>): VisitReport {
+  const rawInternalNotes: string = row.internal_notes || "";
+  const match = rawInternalNotes.match(PHOTO_MARKER_REGEX);
+  const extractedPhoto = row.photo_url || (match ? match[1] : undefined);
+  const cleanInternalNotes = rawInternalNotes
+    .replace(PHOTO_MARKER_REGEX, "")
+    .trim();
+
   return {
     id: row.id,
     requestId: row.request_id ?? undefined,
@@ -188,6 +197,7 @@ export function mapRowToReport(row: Record<string, any>): VisitReport {
     inCasaDoAlto: row.in_casa_do_alto ?? undefined,
     inMinistry: row.in_ministry ?? undefined,
     summary: row.summary ?? undefined,
+    photoUrl: extractedPhoto ?? undefined,
     hasPrayerRequest: row.has_prayer_request ?? undefined,
     prayerRequest: row.prayer_request ?? undefined,
     needsFollowUp: row.needs_follow_up ?? undefined,
@@ -201,12 +211,17 @@ export function mapRowToReport(row: Record<string, any>): VisitReport {
     newVisitTimeframe: row.new_visit_timeframe ?? undefined,
     nextVisitDue: row.next_visit_due ?? null,
     followUpResponsible: row.follow_up_responsible ?? undefined,
-    internalNotes: row.internal_notes ?? undefined,
+    internalNotes: cleanInternalNotes || undefined,
     createdAt: row.created_at,
   };
 }
 
 export function mapReportToRow(rep: VisitReport) {
+  const baseNotes = (rep.internalNotes || "").replace(PHOTO_MARKER_REGEX, "").trim();
+  const combinedNotes = rep.photoUrl
+    ? `${baseNotes}${baseNotes ? "\n" : ""}[[VISIT_PHOTO:${rep.photoUrl}]]`
+    : baseNotes || null;
+
   return {
     id: rep.id,
     request_id: rep.requestId ?? null,
@@ -236,7 +251,7 @@ export function mapReportToRow(rep: VisitReport) {
     new_visit_timeframe: rep.newVisitTimeframe ?? null,
     next_visit_due: rep.nextVisitDue ?? null,
     follow_up_responsible: rep.followUpResponsible ?? null,
-    internal_notes: rep.internalNotes ?? null,
+    internal_notes: combinedNotes,
     created_at: rep.createdAt,
   };
 }

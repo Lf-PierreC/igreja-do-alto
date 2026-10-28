@@ -65,8 +65,7 @@ export default function HomePage() {
               Plataforma integrada de cuidado pastoral da{" "}
               <strong className="font-black text-white">Igreja do Alto</strong>.
               Conectamos membros que desejam receber uma visita pastoral em seus
-              lares aos pastores, líderes e administração responsáveis pelo
-              pastoreio e acompanhamento contínuo.
+              lares.
             </p>
           </div>
         </div>

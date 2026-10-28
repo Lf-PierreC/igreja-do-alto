@@ -526,6 +526,26 @@ export function VisitasPorPessoaTab({
                     </p>
                   )}
 
+                  {rep.photoUrl && (
+                    <div className="mb-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (inModal) setMobileModalOpen(false);
+                          onOpenReportModal(rep);
+                        }}
+                        className="inline-block rounded-2xl overflow-hidden border-2 border-[#252525]/15 hover:border-[#CB4B3B] transition-colors shadow-sm"
+                        title="Ver foto no relatório completo"
+                      >
+                        <img
+                          src={rep.photoUrl}
+                          alt={`Foto da visita em ${formatDateBR(rep.visitDate)}`}
+                          className="h-36 sm:h-44 w-auto max-w-full object-cover"
+                        />
+                      </button>
+                    </div>
+                  )}
+
                   {rep.nextStep && (
                     <div className="p-2.5 sm:p-3 rounded-xl bg-[#DCDACF]/60 border-l-4 border-[#252525] text-xs">
                       <strong>Próximo passo:</strong> {rep.nextStep}
