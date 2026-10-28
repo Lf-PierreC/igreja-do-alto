@@ -325,8 +325,15 @@ export function NovaVisitaFormTab({
       )
       .filter(Boolean);
 
+    if (mode === "new" && !newMemberName.trim()) {
+      setErrorMessage("Por favor, informe o nome da nova pessoa ou família visitada.");
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (finalVisitors.length === 0) {
       setErrorMessage("Selecione quem realizou a visita.");
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -554,8 +561,7 @@ export function NovaVisitaFormTab({
   return (
     <div className="max-w-4xl mx-auto">
       <form
-        action="/api/dados"
-        method="POST"
+        noValidate
         onSubmit={handleSubmit}
         className="rounded-3xl bg-[#F4F3EE]  shadow-xl overflow-hidden"
       >
@@ -1364,7 +1370,6 @@ export function NovaVisitaFormTab({
                   <textarea
                     id="visit-summary"
                     name="summary"
-                    required={happened}
                     rows={3}
                     aria-describedby="visit-summary-hint"
                     value={summary}
