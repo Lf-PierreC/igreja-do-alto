@@ -30,7 +30,7 @@ import {
   VISIT_REASONS,
   YES_NO_UNKNOWN,
 } from "@/data/formOptions";
-import { SITUATION_META, todayISO } from "@/lib/visitasUtils";
+import { SITUATION_META, todayISO, formatDateBR } from "@/lib/visitasUtils";
 import {
   ClipboardCheck,
   AlertCircle,
@@ -42,6 +42,8 @@ import {
   X,
   Camera,
   Trash2,
+  FileText,
+  PlusCircle,
 } from "lucide-react";
 
 interface NovaVisitaFormTabProps {
@@ -49,6 +51,7 @@ interface NovaVisitaFormTabProps {
   preselectedMemberId?: string | null;
   preselectedRequestId?: string | null;
   onReportCreated: (updatedDb: DatabaseSchema) => void;
+  onGoToReportsList?: () => void;
 }
 
 export function NovaVisitaFormTab({
@@ -56,6 +59,7 @@ export function NovaVisitaFormTab({
   preselectedMemberId,
   preselectedRequestId,
   onReportCreated,
+  onGoToReportsList,
 }: NovaVisitaFormTabProps) {
   // 1. Dados da visita
   const [mode, setMode] = useState<"existing" | "new">("existing");
@@ -125,6 +129,12 @@ export function NovaVisitaFormTab({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submittedInfo, setSubmittedInfo] = useState<{
+    memberName: string;
+    visitDate: string;
+    visitors: string[];
+    photoAttached: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (preselectedMemberId) {
@@ -387,6 +397,19 @@ export function NovaVisitaFormTab({
         throw new Error(data.error || "Falha ao salvar o relatório.");
       }
 
+      const targetName =
+        mode === "existing"
+          ? db.members.find((m) => m.id === selectedMemberId)?.name ||
+            "Pessoa/família visitada"
+          : newMemberName.trim() || "Nova pessoa visitada";
+
+      setSubmittedInfo({
+        memberName: targetName,
+        visitDate,
+        visitors: finalVisitors,
+        photoAttached: Boolean(happened && photoUrl),
+      });
+
       setSuccessMessage(
         "Relatório de visita pastoral registrado com sucesso! O prontuário da pessoa/família e o painel de indicadores foram atualizados."
       );
@@ -399,6 +422,10 @@ export function NovaVisitaFormTab({
       setInternalNotes("");
       setSelectedRequestId("");
       onReportCreated(data.db);
+
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (err) {
       setErrorMessage(
         err instanceof Error
@@ -407,6 +434,28 @@ export function NovaVisitaFormTab({
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResetFormForNewReport = () => {
+    setSubmittedInfo(null);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setStartTime("");
+    setEndTime("");
+    setSummary("");
+    setPhotoUrl("");
+    setPrayerRequest("");
+    setLeadershipNote("");
+    setInternalNotes("");
+    setSelectedRequestId("");
+    setVisitHappened(undefined);
+    setNewMemberName("");
+    setNewMemberPhone("");
+    setNewMemberNeighborhood("");
+    setNewMemberAddress("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -447,6 +496,60 @@ export function NovaVisitaFormTab({
   const selectedMemberObj = db.members.find((m) => m.id === selectedMemberId);
 
   const visitorChoices = [...db.pastors.map((p) => p.name), OTHER_LEADER];
+
+  if (submittedInfo) {
+    return (
+      <div className="max-w-2xl mx-auto rounded-3xl bg-[#F4F3EE] border-2 border-[#252525]/15 p-8 sm:p-12 shadow-2xl text-center space-y-6">
+        <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-100 border-2 border-emerald-500 flex items-center justify-center text-emerald-600 shadow-md">
+          <CheckCircle2 className="w-10 h-10" />
+        </div>
+
+        <div className="space-y-2">
+          <span className="inline-block text-xs font-black uppercase tracking-widest text-emerald-800 bg-emerald-100/80 px-3.5 py-1 rounded-full border border-emerald-300">
+            Enviado com Sucesso!
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#252525]">
+            Relatório de Visita Registrado!
+          </h2>
+          <p className="text-sm sm:text-base text-[#252525]/85 max-w-lg mx-auto font-medium leading-relaxed">
+            A visita a <strong>{submittedInfo.memberName}</strong> realizada em{" "}
+            <strong>{formatDateBR(submittedInfo.visitDate)}</strong> por{" "}
+            <strong>{submittedInfo.visitors.join(", ")}</strong> foi gravada com
+            sucesso no sistema da Igreja do Alto.
+          </p>
+        </div>
+
+        {submittedInfo.photoAttached && (
+          <div className="p-3.5 rounded-2xl bg-white border border-[#252525]/15 max-w-md mx-auto text-xs font-bold text-[#252525] flex items-center justify-center gap-2 shadow-sm">
+            <Camera className="w-4 h-4 text-[#CB4B3B]" />
+            <span>Foto do momento da visita anexada e salva no prontuário!</span>
+          </div>
+        )}
+
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleResetFormForNewReport}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider shadow-md transition-colors"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Registrar Outro Relatório
+          </button>
+
+          {onGoToReportsList && (
+            <button
+              type="button"
+              onClick={onGoToReportsList}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#252525] hover:bg-neutral-800 text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Ver em Visitas Registradas
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">

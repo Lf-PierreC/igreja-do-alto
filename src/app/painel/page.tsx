@@ -358,6 +358,7 @@ export default function PainelLideresPage() {
             onReportCreated={(updatedDb) => {
               setDb(updatedDb);
             }}
+            onGoToReportsList={() => setActiveTab("relatorios")}
           />
         )}
 
