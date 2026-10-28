@@ -8,6 +8,11 @@ import {
 } from "@/types/visitas";
 import { INITIAL_DATA } from "@/data/initialData";
 
+// Permite conexões locais em ambiente corporativo com inspeção de certificados SSL (apenas em desenvolvimento local)
+if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 export function getSupabaseClient(): SupabaseClient | null {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = (

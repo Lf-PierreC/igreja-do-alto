@@ -196,18 +196,22 @@ export async function POST(request: Request) {
 
       db.requests.unshift(newRequest);
 
-      if (supabase) {
-        const { error: memErr } = await supabase
-          .from("members")
-          .upsert(mapMemberToRow(member), { onConflict: "id" });
-        if (memErr) throw memErr;
+      writeLocalDb(db);
 
-        const { error: reqErr } = await supabase
-          .from("visit_requests")
-          .upsert(mapRequestToRow(newRequest), { onConflict: "id" });
-        if (reqErr) throw reqErr;
-      } else {
-        writeLocalDb(db);
+      if (supabase) {
+        try {
+          const { error: memErr } = await supabase
+            .from("members")
+            .upsert(mapMemberToRow(member), { onConflict: "id" });
+          if (memErr) console.error("Erro ao salvar membro no Supabase:", memErr);
+
+          const { error: reqErr } = await supabase
+            .from("visit_requests")
+            .upsert(mapRequestToRow(newRequest), { onConflict: "id" });
+          if (reqErr) console.error("Erro ao salvar solicitação no Supabase:", reqErr);
+        } catch (supaErr) {
+          console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
+        }
       }
 
       return NextResponse.json({ ok: true, request: newRequest, db });
@@ -380,25 +384,29 @@ export async function POST(request: Request) {
         }
       }
 
+      writeLocalDb(db);
+
       if (supabase) {
-        const { error: memErr } = await supabase
-          .from("members")
-          .upsert(mapMemberToRow(targetMember), { onConflict: "id" });
-        if (memErr) throw memErr;
+        try {
+          const { error: memErr } = await supabase
+            .from("members")
+            .upsert(mapMemberToRow(targetMember), { onConflict: "id" });
+          if (memErr) console.error("Erro ao salvar membro no Supabase:", memErr);
 
-        if (updatedLinkedReq) {
-          const { error: reqErr } = await supabase
-            .from("visit_requests")
-            .upsert(mapRequestToRow(updatedLinkedReq), { onConflict: "id" });
-          if (reqErr) throw reqErr;
+          if (updatedLinkedReq) {
+            const { error: reqErr } = await supabase
+              .from("visit_requests")
+              .upsert(mapRequestToRow(updatedLinkedReq), { onConflict: "id" });
+            if (reqErr) console.error("Erro ao salvar solicitação no Supabase:", reqErr);
+          }
+
+          const { error: repErr } = await supabase
+            .from("visit_reports")
+            .upsert(mapReportToRow(newReport), { onConflict: "id" });
+          if (repErr) console.error("Erro ao salvar relatório no Supabase:", repErr);
+        } catch (supaErr) {
+          console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
         }
-
-        const { error: repErr } = await supabase
-          .from("visit_reports")
-          .upsert(mapReportToRow(newReport), { onConflict: "id" });
-        if (repErr) throw repErr;
-      } else {
-        writeLocalDb(db);
       }
 
       return NextResponse.json({ ok: true, report: newReport, db });
@@ -413,13 +421,17 @@ export async function POST(request: Request) {
           reqItem.assignedPastor = assignedPastor;
         if (scheduledDate !== undefined) reqItem.scheduledDate = scheduledDate;
 
+        writeLocalDb(db);
+
         if (supabase) {
-          const { error } = await supabase
-            .from("visit_requests")
-            .upsert(mapRequestToRow(reqItem), { onConflict: "id" });
-          if (error) throw error;
-        } else {
-          writeLocalDb(db);
+          try {
+            const { error } = await supabase
+              .from("visit_requests")
+              .upsert(mapRequestToRow(reqItem), { onConflict: "id" });
+            if (error) console.error("Erro no Supabase:", error);
+          } catch (supaErr) {
+            console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
+          }
         }
       }
       return NextResponse.json({ ok: true, db });
@@ -434,13 +446,17 @@ export async function POST(request: Request) {
           member.situationNote = situationNote;
         }
 
+        writeLocalDb(db);
+
         if (supabase) {
-          const { error } = await supabase
-            .from("members")
-            .upsert(mapMemberToRow(member), { onConflict: "id" });
-          if (error) throw error;
-        } else {
-          writeLocalDb(db);
+          try {
+            const { error } = await supabase
+              .from("members")
+              .upsert(mapMemberToRow(member), { onConflict: "id" });
+            if (error) console.error("Erro no Supabase:", error);
+          } catch (supaErr) {
+            console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
+          }
         }
       }
       return NextResponse.json({ ok: true, db });
@@ -462,13 +478,17 @@ export async function POST(request: Request) {
           };
           db.pastors.push(newPastor);
 
+          writeLocalDb(db);
+
           if (supabase) {
-            const { error } = await supabase
-              .from("pastors")
-              .upsert(mapPastorToRow(newPastor), { onConflict: "id" });
-            if (error) throw error;
-          } else {
-            writeLocalDb(db);
+            try {
+              const { error } = await supabase
+                .from("pastors")
+                .upsert(mapPastorToRow(newPastor), { onConflict: "id" });
+              if (error) console.error("Erro no Supabase:", error);
+            } catch (supaErr) {
+              console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
+            }
           }
         }
       }
