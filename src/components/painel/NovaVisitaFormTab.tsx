@@ -52,6 +52,8 @@ interface NovaVisitaFormTabProps {
   preselectedRequestId?: string | null;
   onReportCreated: (updatedDb: DatabaseSchema) => void;
   onGoToReportsList?: () => void;
+  loggedPastorName?: string;
+  isAdmin?: boolean;
 }
 
 export function NovaVisitaFormTab({
@@ -60,6 +62,8 @@ export function NovaVisitaFormTab({
   preselectedRequestId,
   onReportCreated,
   onGoToReportsList,
+  loggedPastorName,
+  isAdmin = true,
 }: NovaVisitaFormTabProps) {
   // 1. Dados da visita
   const [mode, setMode] = useState<"existing" | "new">("existing");
@@ -79,7 +83,7 @@ export function NovaVisitaFormTab({
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [visitors, setVisitors] = useState<string[]>([
-    db.pastors[0]?.name || "Prs. Marcos e Mara",
+    loggedPastorName || db.pastors[0]?.name || "Prs. Marcos e Mara",
   ]);
   const [otherLeaderName, setOtherLeaderName] = useState<string>("");
   const [showAddVisitorBox, setShowAddVisitorBox] = useState(false);
@@ -122,7 +126,7 @@ export function NovaVisitaFormTab({
   const [newVisitTimeframe, setNewVisitTimeframe] =
     useState<NewVisitTimeframe>();
   const [followUpResponsible, setFollowUpResponsible] = useState<string>(
-    db.pastors[0]?.name || ""
+    loggedPastorName || db.pastors[0]?.name || ""
   );
   const [internalNotes, setInternalNotes] = useState<string>("");
 
@@ -135,6 +139,13 @@ export function NovaVisitaFormTab({
     visitors: string[];
     photoAttached: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    if (loggedPastorName) {
+      setVisitors([loggedPastorName]);
+      setFollowUpResponsible(loggedPastorName);
+    }
+  }, [loggedPastorName]);
 
   useEffect(() => {
     if (preselectedMemberId) {
@@ -466,9 +477,14 @@ export function NovaVisitaFormTab({
     }
   };
 
-  const pendingOrScheduledRequests = db.requests.filter(
-    (r) => r.status === "pendente" || r.status === "agendada"
-  );
+  const pendingOrScheduledRequests = db.requests.filter((r) => {
+    const isOpen = r.status === "pendente" || r.status === "agendada";
+    if (!isOpen) return false;
+    if (!isAdmin && loggedPastorName) {
+      return r.assignedPastor === loggedPastorName;
+    }
+    return true;
+  });
 
   const normalizeText = (text?: string) =>
     (text || "")

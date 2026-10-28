@@ -26,17 +26,24 @@ interface SolicitacoesQueueTabProps {
   db: DatabaseSchema;
   onRegisterVisitFromRequest: (req: VisitRequest) => void;
   onDbUpdated: (updatedDb: DatabaseSchema) => void;
+  loggedPastorName?: string;
+  isAdmin?: boolean;
 }
 
 export function SolicitacoesQueueTab({
   db,
   onRegisterVisitFromRequest,
   onDbUpdated,
+  loggedPastorName,
+  isAdmin = true,
 }: SolicitacoesQueueTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("ABERTAS");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const filteredRequests = db.requests.filter((r) => {
+    if (!isAdmin && loggedPastorName) {
+      if (r.assignedPastor !== loggedPastorName) return false;
+    }
     if (statusFilter === "ABERTAS") {
       return r.status === "pendente" || r.status === "agendada";
     }
@@ -81,10 +88,14 @@ export function SolicitacoesQueueTab({
       <div className="rounded-3xl bg-[#F4F3EE] p-4 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 overflow-hidden">
         <div className="min-w-0">
           <span className="block text-[10px] sm:text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
-            Formulário 01 — Solicitação de Visita Pastoral
+            {isAdmin
+              ? "Gestão & Designação de Visitas"
+              : `Solicitações Designadas para ${loggedPastorName}`}
           </span>
           <h2 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-[#252525] mt-0.5">
-            Fila de Solicitações ({filteredRequests.length})
+            {isAdmin
+              ? `Fila de Solicitações (${filteredRequests.length})`
+              : `Minhas Solicitações de Visita (${filteredRequests.length})`}
           </h2>
         </div>
 
@@ -112,6 +123,22 @@ export function SolicitacoesQueueTab({
           ))}
         </div>
       </div>
+
+      {filteredRequests.length === 0 && (
+        <div className="rounded-3xl bg-[#F4F3EE] p-8 sm:p-12 text-center border-2 border-dashed border-[#252525]/20">
+          <UserCheck className="w-10 h-10 text-[#CB4B3B] mx-auto mb-2.5" />
+          <h3 className="text-base sm:text-lg font-black uppercase text-[#252525]">
+            {isAdmin
+              ? "Nenhuma solicitação neste filtro"
+              : "Nenhuma solicitação designada para você neste momento"}
+          </h3>
+          <p className="text-xs sm:text-sm text-[#252525]/70 mt-1 font-medium">
+            {isAdmin
+              ? "Altere o filtro acima para visualizar outras solicitações."
+              : "Quando a administração designar uma nova solicitação de visita para você, ela aparecerá aqui."}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-4">
         {filteredRequests.map((req) => {
@@ -208,33 +235,37 @@ export function SolicitacoesQueueTab({
 
               <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
-                  <label
-                    htmlFor={`assign-${req.id}`}
-                    className="font-black uppercase tracking-wider text-[#252525] inline-flex items-center gap-1.5 shrink-0"
-                  >
+                  <span className="font-black uppercase tracking-wider text-[#252525] inline-flex items-center gap-1.5 shrink-0">
                     <UserCheck className="w-4 h-4 text-[#CB4B3B] shrink-0" />
                     Pastor / Visitador Designado:
-                  </label>
-                  <select
-                    id={`assign-${req.id}`}
-                    disabled={updatingId === req.id}
-                    value={req.assignedPastor || ""}
-                    onChange={(e) =>
-                      handleUpdateRequest(req.id, {
-                        assignedPastor: e.target.value,
-                        status:
-                          req.status === "pendente" ? "agendada" : req.status,
-                      })
-                    }
-                    className="w-full sm:w-auto max-w-full min-w-0 truncate rounded-xl border border-[#252525]/25 bg-white px-3 py-2 text-xs font-bold"
-                  >
-                    <option value="">— Selecionar Visitador —</option>
-                    {db.pastors.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name} ({p.regionFocus})
-                      </option>
-                    ))}
-                  </select>
+                  </span>
+                  {isAdmin ? (
+                    <select
+                      id={`assign-${req.id}`}
+                      aria-label="Pastor ou visitador designado"
+                      disabled={updatingId === req.id}
+                      value={req.assignedPastor || ""}
+                      onChange={(e) =>
+                        handleUpdateRequest(req.id, {
+                          assignedPastor: e.target.value,
+                          status:
+                            req.status === "pendente" ? "agendada" : req.status,
+                        })
+                      }
+                      className="w-full sm:w-auto max-w-full min-w-0 truncate rounded-xl border border-[#252525]/25 bg-white px-3 py-2 text-xs font-bold"
+                    >
+                      <option value="">— Selecionar Visitador —</option>
+                      {db.pastors.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-[#252525] text-[#DCDACF] text-xs font-black">
+                      {req.assignedPastor || loggedPastorName}
+                    </span>
+                  )}
                 </div>
 
                 <div className="text-[#252525]/65 font-semibold shrink-0">

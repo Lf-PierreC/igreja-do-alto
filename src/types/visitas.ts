@@ -148,12 +148,17 @@ export interface VisitReport {
   createdAt: string;
 }
 
+export type UserAccessRole = "admin" | "pastor";
+
 export interface PastorLeader {
   id: string;
   name: string;
   role: string;
   phone: string;
   regionFocus: string;
+  username?: string;
+  password?: string;
+  accessRole?: UserAccessRole;
 }
 
 export interface DatabaseSchema {

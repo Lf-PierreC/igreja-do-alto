@@ -21,6 +21,7 @@ import {
   ServiceAttendance,
   Shift,
   SituationLevel,
+  UserAccessRole,
   VisitHappened,
   VisitReason,
   VisitReport,
@@ -30,6 +31,7 @@ import {
 } from "@/types/visitas";
 import { computeNextVisitDue, todayISO } from "@/lib/visitasUtils";
 import {
+  deriveDefaultUsername,
   fetchDatabaseFromSupabase,
   getSupabaseClient,
   mapMemberToRow,
@@ -41,6 +43,15 @@ import {
 export const dynamic = "force-dynamic";
 
 const DB_FILE_PATH = path.join(process.cwd(), "src", "data", "db.json");
+
+function normalizePastorsList(pastors: PastorLeader[]): PastorLeader[] {
+  return (pastors || []).map((p) => ({
+    ...p,
+    username: (p.username || deriveDefaultUsername(p.name)).trim().toLowerCase(),
+    password: p.password || "igrejadoalto",
+    accessRole: p.accessRole === "admin" ? "admin" : "pastor",
+  }));
+}
 
 function readLocalDb(): DatabaseSchema {
   try {
@@ -63,6 +74,7 @@ function readLocalDb(): DatabaseSchema {
       );
       return INITIAL_DATA;
     }
+    parsed.pastors = normalizePastorsList(parsed.pastors);
     return parsed;
   } catch {
     return INITIAL_DATA;
@@ -463,18 +475,42 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "ADD_PASTOR") {
-      const { name, role } = body.payload as { name: string; role?: string };
+      const {
+        name,
+        role,
+        phone,
+        regionFocus,
+        username,
+        password,
+        accessRole,
+      } = body.payload as {
+        name: string;
+        role?: string;
+        phone?: string;
+        regionFocus?: string;
+        username?: string;
+        password?: string;
+        accessRole?: UserAccessRole;
+      };
       if (name && name.trim()) {
+        const cleanUsername = (
+          username?.trim() || deriveDefaultUsername(name.trim())
+        ).toLowerCase();
         const exists = db.pastors.some(
-          (p) => p.name.toLowerCase() === name.trim().toLowerCase()
+          (p) =>
+            p.name.toLowerCase() === name.trim().toLowerCase() ||
+            (p.username && p.username.toLowerCase() === cleanUsername)
         );
         if (!exists) {
           const newPastor: PastorLeader = {
             id: `pas-${Date.now()}`,
             name: name.trim(),
-            role: role?.trim() || "Pastor(a) / Visitador(a)",
-            phone: "",
-            regionFocus: "Geral",
+            role: role?.trim() || "Pastores",
+            phone: phone?.trim() || "",
+            regionFocus: regionFocus?.trim() || "Igreja do Alto",
+            username: cleanUsername,
+            password: password?.trim() || "igrejadoalto",
+            accessRole: accessRole === "admin" ? "admin" : "pastor",
           };
           db.pastors.push(newPastor);
 
@@ -489,6 +525,82 @@ export async function POST(request: Request) {
             } catch (supaErr) {
               console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
             }
+          }
+        }
+      }
+      return NextResponse.json({ ok: true, db });
+    }
+
+    if (body.action === "UPDATE_PASTOR") {
+      const {
+        id,
+        name,
+        role,
+        phone,
+        regionFocus,
+        username,
+        password,
+        accessRole,
+      } = body.payload as {
+        id: string;
+        name?: string;
+        role?: string;
+        phone?: string;
+        regionFocus?: string;
+        username?: string;
+        password?: string;
+        accessRole?: UserAccessRole;
+      };
+
+      const pastor = db.pastors.find((p) => p.id === id);
+      if (pastor) {
+        if (name !== undefined && name.trim()) pastor.name = name.trim();
+        if (role !== undefined && role.trim()) pastor.role = role.trim();
+        if (phone !== undefined) pastor.phone = phone.trim();
+        if (regionFocus !== undefined && regionFocus.trim()) {
+          pastor.regionFocus = regionFocus.trim();
+        }
+        if (username !== undefined && username.trim()) {
+          pastor.username = username.trim().toLowerCase();
+        }
+        if (password !== undefined && password.trim()) {
+          pastor.password = password.trim();
+        }
+        if (accessRole !== undefined) {
+          pastor.accessRole = accessRole === "admin" ? "admin" : "pastor";
+        }
+
+        writeLocalDb(db);
+
+        if (supabase) {
+          try {
+            const { error } = await supabase
+              .from("pastors")
+              .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+            if (error) console.error("Erro no Supabase:", error);
+          } catch (supaErr) {
+            console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
+          }
+        }
+      }
+      return NextResponse.json({ ok: true, db });
+    }
+
+    if (body.action === "DELETE_PASTOR") {
+      const { id } = body.payload as { id: string };
+      if (id) {
+        db.pastors = db.pastors.filter((p) => p.id !== id);
+        writeLocalDb(db);
+
+        if (supabase) {
+          try {
+            const { error } = await supabase
+              .from("pastors")
+              .delete()
+              .eq("id", id);
+            if (error) console.error("Erro no Supabase:", error);
+          } catch (supaErr) {
+            console.error("Erro de conexão com Supabase (salvo localmente):", supaErr);
           }
         }
       }

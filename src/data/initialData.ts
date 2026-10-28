@@ -9,6 +9,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "marcos",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-2",
@@ -16,6 +19,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "rafael",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-3",
@@ -23,6 +29,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "beto",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-4",
@@ -30,6 +39,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "wenderson",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-5",
@@ -37,6 +49,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "ademir",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-6",
@@ -44,6 +59,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "claudio",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
     {
       id: "pas-7",
@@ -51,6 +69,9 @@ export const INITIAL_DATA: DatabaseSchema = {
       role: "Pastores",
       phone: "",
       regionFocus: "Igreja do Alto",
+      username: "julio",
+      password: "igrejadoalto",
+      accessRole: "pastor",
     },
   ],
   members: [

@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { INITIAL_DATA } from "@/data/initialData";
 import {
   DatabaseSchema,
+  UserAccessRole,
   VisitReport,
   VisitRequest,
 } from "@/types/visitas";
 import { formatDateBR, SITUATION_META } from "@/lib/visitasUtils";
+import { deriveDefaultUsername } from "@/lib/supabase";
 import { LightDismissDialog } from "@/components/LightDismissDialog";
 import {
   DashboardTab,
@@ -19,21 +20,23 @@ import { NovaVisitaFormTab } from "@/components/painel/NovaVisitaFormTab";
 import { RelatoriosListTab } from "@/components/painel/RelatoriosListTab";
 import { VisitasPorPessoaTab } from "@/components/painel/VisitasPorPessoaTab";
 import { SolicitacoesQueueTab } from "@/components/painel/SolicitacoesQueueTab";
+import { EquipeAcessosTab } from "@/components/painel/EquipeAcessosTab";
 import {
   BarChart3,
   ClipboardCheck,
   FileText,
   Users,
   ClipboardList,
-  HeartHandshake,
   Calendar,
   MapPin,
   Clock,
   ArrowUpRight,
-  ArrowLeft,
   Lock,
   LogOut,
   AlertCircle,
+  ShieldCheck,
+  Copy,
+  Check,
 } from "lucide-react";
 
 type ActiveTab =
@@ -41,20 +44,29 @@ type ActiveTab =
   | "nova-visita"
   | "relatorios"
   | "pessoas"
-  | "solicitacoes";
+  | "solicitacoes"
+  | "equipe";
 
-const ADMIN_STORAGE_KEY = "igreja_alto_admin_auth";
+interface LoggedUser {
+  id: string;
+  name: string;
+  username: string;
+  accessRole: UserAccessRole;
+}
+
+const SESSION_STORAGE_KEY = "igreja_alto_user_session_v2";
 const EXPECTED_ADMIN_USER =
   process.env.NEXT_PUBLIC_ADMIN_USER?.trim() || "admin";
 const EXPECTED_ADMIN_PASS =
   process.env.NEXT_PUBLIC_ADMIN_PASS?.trim() || "igrejadoalto";
 
 export default function PainelLideresPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<LoggedUser | null>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [loginUser, setLoginUser] = useState<string>("");
   const [loginPass, setLoginPass] = useState<string>("");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [copiedMemberLink, setCopiedMemberLink] = useState(false);
 
   const [db, setDb] = useState<DatabaseSchema>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
@@ -70,9 +82,15 @@ export default function PainelLideresPage() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(ADMIN_STORAGE_KEY);
-      if (saved === "authenticated") {
-        setIsAuthenticated(true);
+      const saved = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as LoggedUser;
+        if (parsed && parsed.username && parsed.accessRole) {
+          setCurrentUser(parsed);
+          setActiveTab(
+            parsed.accessRole === "admin" ? "dashboard" : "nova-visita"
+          );
+        }
       }
     } catch {
       // ignore storage errors
@@ -92,33 +110,124 @@ export default function PainelLideresPage() {
       });
   }, []);
 
-  const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const isAdmin = currentUser?.accessRole === "admin";
+
+  // Quando a lista de pastores atualiza do banco, sincroniza eventual mudança de permissão do usuário logado
+  useEffect(() => {
+    if (!currentUser || currentUser.id === "master-admin") return;
+    const found = db.pastors.find((p) => p.id === currentUser.id);
+    if (found) {
+      const updatedRole: UserAccessRole =
+        found.accessRole === "admin" ? "admin" : "pastor";
+      if (
+        updatedRole !== currentUser.accessRole ||
+        found.name !== currentUser.name
+      ) {
+        const nextUser: LoggedUser = {
+          ...currentUser,
+          name: found.name,
+          accessRole: updatedRole,
+        };
+        setCurrentUser(nextUser);
+        try {
+          window.localStorage.setItem(
+            SESSION_STORAGE_KEY,
+            JSON.stringify(nextUser)
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [db.pastors, currentUser]);
+
+  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoginError(null);
 
+    const inputUser = loginUser.trim().toLowerCase();
+    const inputPass = loginPass;
+
+    // 1. Verifica Login Mestre de Administrador
     if (
-      loginUser.trim().toLowerCase() === EXPECTED_ADMIN_USER.toLowerCase() &&
-      loginPass === EXPECTED_ADMIN_PASS
+      inputUser === EXPECTED_ADMIN_USER.toLowerCase() &&
+      inputPass === EXPECTED_ADMIN_PASS
     ) {
-      setIsAuthenticated(true);
+      const masterSession: LoggedUser = {
+        id: "master-admin",
+        name: "Administração Geral",
+        username: EXPECTED_ADMIN_USER,
+        accessRole: "admin",
+      };
+      setCurrentUser(masterSession);
+      setActiveTab("dashboard");
       try {
-        window.localStorage.setItem(ADMIN_STORAGE_KEY, "authenticated");
+        window.localStorage.setItem(
+          SESSION_STORAGE_KEY,
+          JSON.stringify(masterSession)
+        );
       } catch {
         // ignore
       }
-    } else {
-      setLoginError("Usuário ou senha inválidos. Verifique suas credenciais.");
+      return;
     }
+
+    // 2. Verifica Login Individual de Pastor / Administrador cadastrado
+    const matchedPastor = db.pastors.find((p) => {
+      const pUser = (p.username || deriveDefaultUsername(p.name))
+        .trim()
+        .toLowerCase();
+      const pName = p.name.trim().toLowerCase();
+      return pUser === inputUser || pName === inputUser;
+    });
+
+    if (matchedPastor) {
+      const expectedPass = matchedPastor.password || "igrejadoalto";
+      if (inputPass === expectedPass) {
+        const role: UserAccessRole =
+          matchedPastor.accessRole === "admin" ? "admin" : "pastor";
+        const pastorSession: LoggedUser = {
+          id: matchedPastor.id,
+          name: matchedPastor.name,
+          username:
+            matchedPastor.username || deriveDefaultUsername(matchedPastor.name),
+          accessRole: role,
+        };
+        setCurrentUser(pastorSession);
+        setActiveTab(role === "admin" ? "dashboard" : "nova-visita");
+        try {
+          window.localStorage.setItem(
+            SESSION_STORAGE_KEY,
+            JSON.stringify(pastorSession)
+          );
+        } catch {
+          // ignore
+        }
+        return;
+      }
+    }
+
+    setLoginError("Usuário ou senha inválidos. Verifique suas credenciais.");
   };
 
-  const handleAdminLogout = () => {
-    setIsAuthenticated(false);
+  const handleLogout = () => {
+    setCurrentUser(null);
     setLoginPass("");
     try {
-      window.localStorage.removeItem(ADMIN_STORAGE_KEY);
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
     } catch {
       // ignore
     }
+  };
+
+  const handleCopyMemberLink = () => {
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/solicitar-visita`
+        : "/solicitar-visita";
+    navigator.clipboard?.writeText(url);
+    setCopiedMemberLink(true);
+    setTimeout(() => setCopiedMemberLink(false), 2200);
   };
 
   const handleSelectMemberForHistory = (memberId: string) => {
@@ -148,29 +257,70 @@ export default function PainelLideresPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const openRequestsCount = db.requests.filter(
-    (r) => r.status === "pendente" || r.status === "agendada"
-  ).length;
+  // Filtra dados para a visão restrita de Pastor (pessoas que ele já visitou e solicitações designadas para ele)
+  const pastorScopedDb = useMemo<DatabaseSchema>(() => {
+    if (!currentUser || isAdmin) return db;
+    const pastorName = currentUser.name;
+    const visitedMemberIds = new Set(
+      db.reports
+        .filter((rep) => (rep.visitors || []).includes(pastorName))
+        .map((rep) => rep.memberId)
+    );
+    const filteredMembers = db.members.filter(
+      (m) =>
+        visitedMemberIds.has(m.id) ||
+        (m.lastVisitedBy && m.lastVisitedBy.includes(pastorName))
+    );
+    const filteredReports = db.reports.filter(
+      (rep) =>
+        visitedMemberIds.has(rep.memberId) ||
+        (rep.visitors || []).includes(pastorName)
+    );
+    return {
+      ...db,
+      members: filteredMembers,
+      reports: filteredReports,
+    };
+  }, [db, currentUser, isAdmin]);
+
+  const openRequestsCount = useMemo(() => {
+    return db.requests.filter((r) => {
+      const isOpen = r.status === "pendente" || r.status === "agendada";
+      if (!isOpen) return false;
+      if (!isAdmin && currentUser) {
+        return r.assignedPastor === currentUser.name;
+      }
+      return true;
+    }).length;
+  }, [db.requests, isAdmin, currentUser]);
 
   if (!authChecked) {
     return <div className="min-h-screen bg-[#DCDACF]" />;
   }
 
-  if (!isAuthenticated) {
+  if (!currentUser) {
     return (
       <div className="min-h-screen flex flex-col bg-[#DCDACF] text-[#252525]">
         <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-            <Link href="/" aria-label="Voltar para a página inicial">
-              <BrandLogo variant="on-dark2" size="sm" showTagline />
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+            <BrandLogo variant="on-dark2" size="sm" showTagline />
+            <button
+              type="button"
+              onClick={handleCopyMemberLink}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Início
-            </Link>
+              {copiedMemberLink ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  Link de Membros Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-[#CB4B3B]" />
+                  Copiar Link de Membros
+                </>
+              )}
+            </button>
           </div>
         </header>
 
@@ -182,15 +332,15 @@ export default function PainelLideresPage() {
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#CB4B3B]">
-                  Acesso Restrito
+                  Ministério de Visitação • Igreja do Alto
                 </span>
                 <h1 className="text-lg sm:text-xl font-black uppercase tracking-tight">
-                  Administração Pastoral
+                  Acesso de Pastores & Admin
                 </h1>
               </div>
             </div>
 
-            <form onSubmit={handleAdminLogin} className="p-6 sm:p-8 space-y-5">
+            <form onSubmit={handleLogin} className="p-6 sm:p-8 space-y-5">
               {loginError && (
                 <div
                   role="alert"
@@ -203,32 +353,32 @@ export default function PainelLideresPage() {
 
               <div>
                 <label
-                  htmlFor="admin-user"
+                  htmlFor="login-user"
                   className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
                 >
-                  Usuário Administrador
+                  Seu Usuário
                 </label>
                 <input
-                  id="admin-user"
+                  id="login-user"
                   type="text"
                   required
                   autoComplete="username"
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="Digite o usuário"
+                  placeholder="Ex: marcos, rafael, admin..."
                   className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 text-sm font-semibold text-[#252525]"
                 />
               </div>
 
               <div>
                 <label
-                  htmlFor="admin-pass"
+                  htmlFor="login-pass"
                   className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
                 >
                   Senha de Acesso
                 </label>
                 <input
-                  id="admin-pass"
+                  id="login-pass"
                   type="password"
                   required
                   autoComplete="current-password"
@@ -243,7 +393,7 @@ export default function PainelLideresPage() {
                 type="submit"
                 className="w-full py-3.5 px-6 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-colors"
               >
-                Entrar no Painel Completo
+                Entrar no Sistema
               </button>
             </form>
           </div>
@@ -252,31 +402,97 @@ export default function PainelLideresPage() {
     );
   }
 
+  const navigationTabs = isAdmin
+    ? ([
+        {
+          id: "dashboard",
+          label: "Dashboard",
+          icon: BarChart3,
+        },
+        {
+          id: "nova-visita",
+          label: "Relatório de Visita",
+          icon: ClipboardCheck,
+        },
+        {
+          id: "relatorios",
+          label: `Visitas Registradas (${db.reports.length})`,
+          icon: FileText,
+        },
+        {
+          id: "pessoas",
+          label: `Visitas por Pessoa (${db.members.length})`,
+          icon: Users,
+        },
+        {
+          id: "solicitacoes",
+          label: `Solicitações (${openRequestsCount})`,
+          icon: ClipboardList,
+        },
+        {
+          id: "equipe",
+          label: `Equipe & Acessos (${db.pastors.length})`,
+          icon: ShieldCheck,
+        },
+      ] as const)
+    : ([
+        {
+          id: "nova-visita",
+          label: "Registrar Relatório de Visita",
+          icon: ClipboardCheck,
+        },
+        {
+          id: "solicitacoes",
+          label: `Minhas Solicitações (${openRequestsCount})`,
+          icon: ClipboardList,
+        },
+        {
+          id: "pessoas",
+          label: `Pessoas que Visitei (${pastorScopedDb.members.length})`,
+          icon: Users,
+        },
+      ] as const);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#DCDACF] text-[#252525]">
       {/* Top Navigation Header */}
       <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B] sticky top-0 z-30 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-          <Link
-            href="/"
-            aria-label="Ir para a página inicial da Igreja do Alto"
-          >
-            <BrandLogo variant="on-dark2" size="sm" showTagline />
-          </Link>
+          <BrandLogo variant="on-dark2" size="sm" showTagline />
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Início
-            </Link>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#363636] text-[#DCDACF] text-xs font-extrabold">
+              <span className="w-2 h-2 rounded-full bg-[#CB4B3B]" />
+              <span>{currentUser.name}</span>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#252525] text-[#CB4B3B] font-black">
+                {isAdmin ? "Admin" : "Pastor"}
+              </span>
+            </span>
+
             <button
               type="button"
-              onClick={handleAdminLogout}
+              onClick={handleCopyMemberLink}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
-              title="Encerrar sessão administrativa"
+              title="Copiar link do formulário de membros"
+            >
+              {copiedMemberLink ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden sm:inline">Link Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span className="hidden sm:inline">Link de Membros</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
+              title="Encerrar sessão"
             >
               <LogOut className="w-4 h-4" />
               Sair
@@ -287,35 +503,7 @@ export default function PainelLideresPage() {
         {/* Sub-navigation Tabs */}
         <div className="bg-[#1b1b1b] border-t border-[#DCDACF]/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden gap-1 sm:gap-2 py-2">
-            {(
-              [
-                {
-                  id: "dashboard",
-                  label: "Dashboard & Indicadores",
-                  icon: BarChart3,
-                },
-                {
-                  id: "nova-visita",
-                  label: "Relatório de Visita",
-                  icon: ClipboardCheck,
-                },
-                {
-                  id: "relatorios",
-                  label: `Visitas Registradas (${db.reports.length})`,
-                  icon: FileText,
-                },
-                {
-                  id: "pessoas",
-                  label: `Visitas por Pessoa (${db.members.length})`,
-                  icon: Users,
-                },
-                {
-                  id: "solicitacoes",
-                  label: `Solicitações (${openRequestsCount})`,
-                  icon: ClipboardList,
-                },
-              ] as const
-            ).map((tab) => {
+            {navigationTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -340,7 +528,7 @@ export default function PainelLideresPage() {
 
       {/* Main Workspace Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {activeTab === "dashboard" && (
+        {isAdmin && activeTab === "dashboard" && (
           <DashboardTab
             db={db}
             onSelectMemberForHistory={handleSelectMemberForHistory}
@@ -355,14 +543,20 @@ export default function PainelLideresPage() {
             db={db}
             preselectedMemberId={selectedMemberId}
             preselectedRequestId={preselectedRequestId}
+            loggedPastorName={!isAdmin ? currentUser.name : undefined}
+            isAdmin={isAdmin}
             onReportCreated={(updatedDb) => {
               setDb(updatedDb);
             }}
-            onGoToReportsList={() => setActiveTab("relatorios")}
+            onGoToReportsList={
+              isAdmin
+                ? () => setActiveTab("relatorios")
+                : () => setActiveTab("pessoas")
+            }
           />
         )}
 
-        {activeTab === "relatorios" && (
+        {isAdmin && activeTab === "relatorios" && (
           <RelatoriosListTab
             db={db}
             onOpenReportModal={(report) => setModalReport(report)}
@@ -373,8 +567,14 @@ export default function PainelLideresPage() {
 
         {activeTab === "pessoas" && (
           <VisitasPorPessoaTab
-            db={db}
-            selectedMemberId={selectedMemberId}
+            db={isAdmin ? db : pastorScopedDb}
+            selectedMemberId={
+              isAdmin
+                ? selectedMemberId
+                : pastorScopedDb.members.some((m) => m.id === selectedMemberId)
+                ? selectedMemberId
+                : pastorScopedDb.members[0]?.id || null
+            }
             presetFilter={pessoasPresetFilter}
             onSelectMember={(memberId) => setSelectedMemberId(memberId)}
             onStartVisitForMember={handleStartVisitForMember}
@@ -386,7 +586,16 @@ export default function PainelLideresPage() {
         {activeTab === "solicitacoes" && (
           <SolicitacoesQueueTab
             db={db}
+            isAdmin={isAdmin}
+            loggedPastorName={!isAdmin ? currentUser.name : undefined}
             onRegisterVisitFromRequest={handleRegisterVisitFromRequest}
+            onDbUpdated={(updatedDb) => setDb(updatedDb)}
+          />
+        )}
+
+        {isAdmin && activeTab === "equipe" && (
+          <EquipeAcessosTab
+            db={db}
             onDbUpdated={(updatedDb) => setDb(updatedDb)}
           />
         )}

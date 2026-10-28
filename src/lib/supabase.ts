@@ -43,23 +43,57 @@ export function getSupabaseClient(): SupabaseClient | null {
 // MAPPERS: SUPABASE (snake_case) <-> TYPESCRIPT (camelCase)
 // ============================================================================
 
+const PASTOR_AUTH_REGEX = /^\[\[AUTH:([^|]*)\|([^|]*)\|([^\]]*)\]\]/;
+
+export function deriveDefaultUsername(name: string): string {
+  const cleaned = name
+    .replace(/^(prs?\.|pras?\.|di[áa]c\.|l[íi]der)\s*/i, "")
+    .trim();
+  const firstWord = (cleaned.split(/\s+/)[0] || "pastor")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "");
+  return firstWord || "pastor";
+}
+
 export function mapRowToPastor(row: Record<string, any>): PastorLeader {
+  const rawRegion: string = row.region_focus || "Igreja do Alto";
+  const match = rawRegion.match(PASTOR_AUTH_REGEX);
+
+  const username =
+    row.username ||
+    (match && match[1] ? match[1] : deriveDefaultUsername(row.name || ""));
+  const password =
+    row.password || (match && match[2] ? match[2] : "igrejadoalto");
+  const rawAccessRole = row.access_role || (match && match[3] ? match[3] : "pastor");
+  const accessRole = rawAccessRole === "admin" ? "admin" : "pastor";
+  const cleanRegion = rawRegion.replace(PASTOR_AUTH_REGEX, "").trim() || "Igreja do Alto";
+
   return {
     id: row.id,
     name: row.name,
-    role: row.role || "Pastor(a) / Visitador(a)",
+    role: row.role || "Pastores",
     phone: row.phone || "",
-    regionFocus: row.region_focus || "Geral",
+    regionFocus: cleanRegion,
+    username,
+    password,
+    accessRole,
   };
 }
 
 export function mapPastorToRow(p: PastorLeader) {
+  const username = (p.username || deriveDefaultUsername(p.name)).trim().toLowerCase();
+  const password = p.password || "igrejadoalto";
+  const accessRole = p.accessRole === "admin" ? "admin" : "pastor";
+  const cleanRegion = (p.regionFocus || "Igreja do Alto").replace(PASTOR_AUTH_REGEX, "").trim() || "Igreja do Alto";
+
   return {
     id: p.id,
     name: p.name,
-    role: p.role,
-    phone: p.phone,
-    region_focus: p.regionFocus,
+    role: p.role || "Pastores",
+    phone: p.phone || "",
+    region_focus: `[[AUTH:${username}|${password}|${accessRole}]]${cleanRegion}`,
   };
 }
 
