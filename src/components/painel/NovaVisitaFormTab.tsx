@@ -252,7 +252,7 @@ export function NovaVisitaFormTab({
     }
   };
 
-  const happened = visitHappened === "Sim";
+  const happened = !visitHappened || visitHappened === "Sim";
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -348,7 +348,7 @@ export function NovaVisitaFormTab({
             approxTime: formattedApproxTime,
             visitors: finalVisitors,
             othersPresent: othersPresent || undefined,
-            visitHappened,
+            visitHappened: visitHappened || "Sim",
             mainReason: happened ? mainReason : undefined,
             situation: happened ? situation : undefined,
             serviceAttendance: happened ? serviceAttendance : undefined,
