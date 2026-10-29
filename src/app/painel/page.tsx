@@ -71,7 +71,7 @@ export default function PainelLideresPage() {
   const [db, setDb] = useState<DatabaseSchema>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(
-    INITIAL_DATA.members[0]?.id || null
+    null
   );
   const [pessoasPresetFilter, setPessoasPresetFilter] =
     useState<PessoasPresetFilter>("TODOS");
@@ -570,7 +570,7 @@ export default function PainelLideresPage() {
             db={isAdmin ? db : pastorScopedDb}
             selectedMemberId={
               isAdmin
-                ? selectedMemberId
+                ? selectedMemberId || db.members[0]?.id || null
                 : pastorScopedDb.members.some((m) => m.id === selectedMemberId)
                 ? selectedMemberId
                 : pastorScopedDb.members[0]?.id || null

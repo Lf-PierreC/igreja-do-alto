@@ -71,7 +71,7 @@ export function NovaVisitaFormTab({
     preselectedRequestId || ""
   );
   const [selectedMemberId, setSelectedMemberId] = useState<string>(
-    preselectedMemberId || db.members[0]?.id || ""
+    preselectedMemberId || ""
   );
   const [memberSearch, setMemberSearch] = useState<string>("");
   const [newMemberName, setNewMemberName] = useState("");
@@ -94,8 +94,7 @@ export function NovaVisitaFormTab({
   const [visitHappened, setVisitHappened] = useState<VisitHappened>();
 
   // 2. Características da visita
-  const [mainReason, setMainReason] = useState<VisitReason>(
-  );
+  const [mainReason, setMainReason] = useState<VisitReason>();
   const [situation, setSituation] = useState<SituationLevel>();
 
   // 3. Vida na igreja
@@ -109,8 +108,7 @@ export function NovaVisitaFormTab({
   const [summary, setSummary] = useState<string>("");
   const [photoUrl, setPhotoUrl] = useState<string>("");
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
-  const [hasPrayerRequest, setHasPrayerRequest] = useState<"Não" | "Sim">(
-  );
+  const [hasPrayerRequest, setHasPrayerRequest] = useState<"Não" | "Sim">();
   const [prayerRequest, setPrayerRequest] = useState<string>("");
   const [needsFollowUp, setNeedsFollowUp] = useState<"Não" | "Sim">();
   const [followUpNeeds, setFollowUpNeeds] = useState<FollowUpNeed[]>([]);
@@ -119,9 +117,7 @@ export function NovaVisitaFormTab({
   const [leadershipNote, setLeadershipNote] = useState<string>("");
 
   // 5. Próximos passos
-  const [nextStep, setNextStep] = useState<NextStep>(
-    
-  );
+  const [nextStep, setNextStep] = useState<NextStep>();
   const [needsNewVisit, setNeedsNewVisit] = useState<NewVisitNeeded>();
   const [newVisitTimeframe, setNewVisitTimeframe] =
     useState<NewVisitTimeframe>();
@@ -151,14 +147,6 @@ export function NovaVisitaFormTab({
     if (preselectedMemberId) {
       setMode("existing");
       setSelectedMemberId(preselectedMemberId);
-      const mem = db.members.find((m) => m.id === preselectedMemberId);
-      if (mem) {
-        setSituation(mem.situation);
-        if (mem.needs.length > 0) {
-          setNeedsFollowUp("Sim");
-          setFollowUpNeeds(mem.needs);
-        }
-      }
     }
     if (preselectedRequestId) {
       setSelectedRequestId(preselectedRequestId);
@@ -176,7 +164,7 @@ export function NovaVisitaFormTab({
         }
       }
     }
-  }, [preselectedMemberId, preselectedRequestId, db.members, db.requests]);
+  }, [preselectedMemberId, preselectedRequestId, db.requests]);
 
   const toggleVisitor = (name: string) => {
     setVisitors((prev) =>
@@ -225,10 +213,6 @@ export function NovaVisitaFormTab({
 
   const handleMemberSelect = (memberId: string) => {
     setSelectedMemberId(memberId);
-    const mem = db.members.find((m) => m.id === memberId);
-    if (mem) {
-      setSituation(mem.situation);
-    }
 
     const openReq = db.requests.find(
       (r) =>
@@ -258,10 +242,6 @@ export function NovaVisitaFormTab({
     if (req) {
       setMode("existing");
       setSelectedMemberId(req.memberId);
-      const mem = db.members.find((m) => m.id === req.memberId);
-      if (mem) {
-        setSituation(mem.situation);
-      }
       const mapped = req.reasons
         .map((r) => REQUEST_TO_VISIT_REASON[r])
         .find(Boolean);
@@ -435,10 +415,31 @@ export function NovaVisitaFormTab({
       setEndTime("");
       setSummary("");
       setPhotoUrl("");
+      setHasPrayerRequest(undefined);
       setPrayerRequest("");
+      setNeedsFollowUp(undefined);
+      setFollowUpNeeds([]);
+      setLeadershipCommunication("Não");
       setLeadershipNote("");
+      setNextStep(undefined);
+      setNeedsNewVisit(undefined);
+      setNewVisitTimeframe(undefined);
       setInternalNotes("");
       setSelectedRequestId("");
+      setVisitHappened(undefined);
+      setMainReason(undefined);
+      setSituation(undefined);
+      setServiceAttendance(undefined);
+      setIntegration(undefined);
+      setInCasaDoAlto(undefined);
+      setInMinistry(undefined);
+      setMode("existing");
+      setSelectedMemberId("");
+      setMemberSearch("");
+      setNewMemberName("");
+      setNewMemberPhone("");
+      setNewMemberNeighborhood("");
+      setNewMemberAddress("");
       onReportCreated(data.db);
 
       if (typeof window !== "undefined") {
@@ -459,19 +460,37 @@ export function NovaVisitaFormTab({
     setSubmittedInfo(null);
     setSuccessMessage(null);
     setErrorMessage(null);
-    setStartTime("");
-    setEndTime("");
-    setSummary("");
-    setPhotoUrl("");
-    setPrayerRequest("");
-    setLeadershipNote("");
-    setInternalNotes("");
-    setSelectedRequestId("");
-    setVisitHappened(undefined);
+    setMode("existing");
+    setSelectedMemberId("");
+    setMemberSearch("");
     setNewMemberName("");
     setNewMemberPhone("");
     setNewMemberNeighborhood("");
     setNewMemberAddress("");
+    setVisitDate(todayISO());
+    setStartTime("");
+    setEndTime("");
+    setOthersPresent("");
+    setVisitHappened(undefined);
+    setMainReason(undefined);
+    setSituation(undefined);
+    setServiceAttendance(undefined);
+    setIntegration(undefined);
+    setInCasaDoAlto(undefined);
+    setInMinistry(undefined);
+    setSummary("");
+    setPhotoUrl("");
+    setHasPrayerRequest(undefined);
+    setPrayerRequest("");
+    setNeedsFollowUp(undefined);
+    setFollowUpNeeds([]);
+    setLeadershipCommunication("Não");
+    setLeadershipNote("");
+    setNextStep(undefined);
+    setNeedsNewVisit(undefined);
+    setNewVisitTimeframe(undefined);
+    setInternalNotes("");
+    setSelectedRequestId("");
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
