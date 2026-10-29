@@ -102,7 +102,14 @@ export function SolicitacoesQueueTab({
   };
 
   const selectedMemberData = selectedRequestDetails
-    ? db.members.find((m) => m.id === selectedRequestDetails.memberId)
+    ? db.members.find(
+        (m) =>
+          m.id === selectedRequestDetails.memberId ||
+          m.phone.replace(/\D/g, "") ===
+            selectedRequestDetails.phone.replace(/\D/g, "") ||
+          m.name.toLowerCase().trim() ===
+            selectedRequestDetails.memberName.toLowerCase().trim()
+      )
     : null;
 
   return (
