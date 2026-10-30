@@ -91,7 +91,6 @@ const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
 type ActiveTab =
   | "todos-membros"
   | "gestao-pastores"
-  | "visitas-cuidado"
   | "ministerios"
   | "familia"
   | "solicitar-visita"
@@ -239,8 +238,7 @@ export default function PortalDoMembroPage() {
   const [memberFilterCategory, setMemberFilterCategory] = useState<
     "todos" | "membros" | "pastores" | "admins" | "visitantes"
   >("todos");
-  const [visitedSearchQuery, setVisitedSearchQuery] = useState("");
-  const [visitedPastorFilter, setVisitedPastorFilter] = useState("todos");
+
   const [adminFeedback, setAdminFeedback] = useState<{
     type: "success" | "error";
     text: string;
@@ -1105,11 +1103,16 @@ export default function PortalDoMembroPage() {
     }
   };
 
-  const handleOpenVisitsPortal = () => {
+  const handleOpenVisitsPortal = (
+    targetTab?: "pessoas" | "nova-visita" | "dashboard" | React.MouseEvent
+  ) => {
     if (!session) return;
+    const tab = typeof targetTab === "string" ? targetTab : "pessoas";
     try {
       const userSession = {
+        id: session.isAdmin ? "master-admin" : session.id,
         name: session.name,
+        username: session.cpf || session.name.toLowerCase().replace(/\s+/g, "."),
         role: session.isAdmin ? "admin" : "pastor",
         accessRole: session.isAdmin ? "admin" : "pastor",
         isMasterAdmin: Boolean(session.isAdmin),
@@ -1119,7 +1122,7 @@ export default function PortalDoMembroPage() {
         JSON.stringify(userSession)
       );
     } catch {}
-    window.open("/painel?tab=pessoas", "_blank");
+    window.open(`/painel?tab=${tab}`, "_blank");
   };
 
   if (!authChecked) {
@@ -1830,32 +1833,6 @@ export default function PortalDoMembroPage() {
     return true;
   });
 
-  const filteredReports = allReports.filter((r) => {
-    if (!session?.isAdmin && session?.name) {
-      const pName = session.name.toLowerCase();
-      const hasPastor = (r.visitors || []).some(
-        (v) => v.toLowerCase().includes(pName) || pName.includes(v.toLowerCase())
-      );
-      if (!hasPastor) {
-        return false;
-      }
-    }
-
-    if (session?.isAdmin && visitedPastorFilter !== "todos") {
-      const matchesPastor = (r.visitors || []).some(
-        (v) => v === visitedPastorFilter
-      );
-      if (!matchesPastor) return false;
-    }
-
-    const q = visitedSearchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      (r.memberName && r.memberName.toLowerCase().includes(q)) ||
-      (r.summary && r.summary.toLowerCase().includes(q)) ||
-      (r.visitors && r.visitors.some((v) => v.toLowerCase().includes(q)))
-    );
-  });
 
   const totalVolunteersActive = allMembers.filter(
     (m) => (m.currentMinistries || []).length > 0
@@ -1961,11 +1938,6 @@ export default function PortalDoMembroPage() {
                 id: "ministerios",
                 label: "Ministérios & Voluntários",
                 icon: Sparkles,
-              });
-              tabs.push({
-                id: "visitas-cuidado",
-                label: "Visitas por Pessoas",
-                icon: ClipboardCheck,
               });
             }
 
@@ -3418,7 +3390,18 @@ export default function PortalDoMembroPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleOpenVisitsPortal("pessoas")}
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors"
+                  title="Abrir o Portal de Visitas com histórico completo e acompanhamento pastoral por pessoas"
+                >
+                  <ClipboardCheck className="w-4 h-4 text-[#EBD57B]" />
+                  <span>Visitas por Pessoas</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-[#DCDACF]/60" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsAddMemberModalOpen(true)}
@@ -4315,166 +4298,6 @@ export default function PortalDoMembroPage() {
           </div>
         )}
 
-        {/* ===================================================================
-            ABA 7: VISITAS & CUIDADO (Pastor & Admin)
-           =================================================================== */}
-        {activeTab === "visitas-cuidado" && (session?.isPastor || session?.isAdmin) && (
-          <div className="space-y-6">
-            {/* Banner Superior com Link para o Portal de Visitas */}
-            <div className="rounded-3xl bg-[#252525] text-[#DCDACF] p-6 sm:p-8 border-b-4 border-[#CB4B3B] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1.5 max-w-2xl">
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
-                  <HeartHandshake className="w-4 h-4" />
-                  Acompanhamento Pastoral Integrado
-                </span>
-                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
-                  Visitas por Pessoas & Cuidado Familiar
-                </h2>
-                <p className="text-xs sm:text-sm text-[#DCDACF]/80 leading-relaxed">
-                  Acompanhe os diagnósticos, motivos de oração e histórico das pessoas visitadas.
-                  Para relatórios detalhados e designação de visitas, acesse o painel completo.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleOpenVisitsPortal}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow shrink-0"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>Abrir Portal de Visitas Completo</span>
-              </button>
-            </div>
-
-            {/* Barra de Filtros */}
-            <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={visitedSearchQuery}
-                  onChange={(e) => setVisitedSearchQuery(e.target.value)}
-                  placeholder="Pesquisar por nome da pessoa visitada ou observações..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold text-[#252525]"
-                />
-              </div>
-
-              {session?.isAdmin && pastorsList.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#252525]/70 whitespace-nowrap">
-                    Pastor:
-                  </span>
-                  <select
-                    value={visitedPastorFilter}
-                    onChange={(e) => setVisitedPastorFilter(e.target.value)}
-                    className="rounded-xl border-2 border-[#252525]/20 bg-white px-3 py-2 text-xs font-bold text-[#252525]"
-                  >
-                    <option value="todos">Todos os Pastores</option>
-                    {pastorsList.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Lista dos Relatórios de Visita por Pessoa */}
-            <div className="space-y-4">
-              {filteredReports.length === 0 ? (
-                <div className="p-8 rounded-3xl bg-white border border-[#252525]/10 text-center space-y-3">
-                  <HeartHandshake className="w-10 h-10 text-[#CB4B3B] mx-auto opacity-40" />
-                  <h4 className="text-base font-black text-[#252525]">
-                    Nenhum registro de visita localizado
-                  </h4>
-                  <p className="text-xs text-[#252525]/60 max-w-md mx-auto">
-                    Não foram encontrados relatórios para o filtro informado. Acesse o portal de
-                    visitas para registrar novos relatórios pastorais.
-                  </p>
-                </div>
-              ) : (
-                filteredReports.map((r) => {
-                  const meta = r.situation
-                    ? SITUATION_META[r.situation]
-                    : SITUATION_META.bem;
-
-                  return (
-                    <div
-                      key={r.id}
-                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-3 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#252525]/10">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-base font-black text-[#252525]">
-                            {r.memberName}
-                          </h4>
-                          <span
-                            className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
-                            style={{ backgroundColor: meta.color }}
-                          >
-                            {meta.emoji} {meta.shortLabel}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs font-bold text-[#252525]/70">
-                          <Calendar className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                          <span>
-                            Visita em: <strong>{formatDateBR(r.visitDate)}</strong>
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-[#252525]/80">
-                        <div>
-                          <span className="text-[#252525]/60 block text-[11px] font-bold uppercase">
-                            Pastor(es) Responsável(is):
-                          </span>
-                          <strong>
-                            {(r.visitors || []).join(", ") || "Equipe Pastoral"}
-                          </strong>
-                        </div>
-                        <div>
-                          <span className="text-[#252525]/60 block text-[11px] font-bold uppercase">
-                            Motivo Principal:
-                          </span>
-                          <span>{r.mainReason || "Comunhão pastoral"}</span>
-                        </div>
-                      </div>
-
-                      {r.summary && (
-                        <div className="p-3 rounded-2xl bg-[#F4F3EE] text-xs font-medium text-[#252525]/85">
-                          <span className="block text-[11px] font-black uppercase text-[#CB4B3B] mb-0.5">
-                            Diagnóstico Pastoral & Observações:
-                          </span>
-                          <p className="whitespace-pre-line leading-relaxed">
-                            {r.summary}
-                          </p>
-                        </div>
-                      )}
-
-                      {r.followUpNeeds && r.followUpNeeds.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-[11px] font-black uppercase text-[#252525]/60 mr-1">
-                            Acompanhamento:
-                          </span>
-                          {r.followUpNeeds.map((need, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 rounded-lg bg-[#DCDACF] text-[#252525] text-[10px] font-bold"
-                            >
-                              {need}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
 
       </main>
 
@@ -5262,11 +5085,24 @@ export default function PortalDoMembroPage() {
               </div>
             )}
 
-            <div className="flex items-center justify-end pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#252525]/15">
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenVisitsPortal("pessoas");
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                title="Acessar o Portal de Visitas com histórico de cuidados desta pessoa"
+              >
+                <ClipboardCheck className="w-4 h-4 text-[#EBD57B]" />
+                <span>Ver Visitas no Portal</span>
+                <ExternalLink className="w-3.5 h-3.5 text-[#DCDACF]/60" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedMemberDetail(null)}
-                className="px-5 py-2.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors"
+                className="px-5 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors"
               >
                 Fechar Perfil
               </button>

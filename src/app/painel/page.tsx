@@ -85,12 +85,34 @@ export default function PainelLideresPage() {
     try {
       const saved = window.localStorage.getItem(SESSION_STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as LoggedUser;
-        if (parsed && parsed.username && parsed.accessRole) {
-          setCurrentUser(parsed);
-          setActiveTab(
-            parsed.accessRole === "admin" ? "dashboard" : "nova-visita"
-          );
+        const parsed = JSON.parse(saved) as any;
+        const role = parsed.accessRole || parsed.role || "pastor";
+        if (parsed && (parsed.username || parsed.name)) {
+          const userObj: LoggedUser = {
+            id: parsed.id || (role === "admin" ? "master-admin" : "pastor-session"),
+            name: parsed.name || "Pastor",
+            username: parsed.username || (parsed.name ? parsed.name.toLowerCase().replace(/\s+/g, ".") : "admin"),
+            accessRole: role,
+          };
+          setCurrentUser(userObj);
+
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get("tab");
+            if (tabParam === "pessoas") {
+              setActiveTab("pessoas");
+            } else if (tabParam === "nova-visita") {
+              setActiveTab("nova-visita");
+            } else if (tabParam === "solicitacoes") {
+              setActiveTab("solicitacoes");
+            } else if (tabParam === "relatorios" && role === "admin") {
+              setActiveTab("relatorios");
+            } else {
+              setActiveTab(role === "admin" ? "dashboard" : "nova-visita");
+            }
+          } catch {
+            setActiveTab(role === "admin" ? "dashboard" : "nova-visita");
+          }
         }
       }
     } catch {
