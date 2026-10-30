@@ -331,27 +331,64 @@ export async function POST(request: Request) {
         );
       }
 
+      if (updates.name && updates.name.trim()) {
+        member.name = updates.name.trim();
+      }
+
+      if (updates.email && updates.email.trim()) {
+        const normEmail = updates.email.trim().toLowerCase();
+        const emailConflict = db.members.find(
+          (m) => m.id !== memberId && (m.email || "").trim().toLowerCase() === normEmail
+        );
+        if (emailConflict) {
+          return NextResponse.json(
+            { error: "Este e-mail já está em uso por outro membro." },
+            { status: 409 }
+          );
+        }
+        member.email = normEmail;
+      }
+
       if (updates.phone) member.phone = updates.phone.trim();
       if (updates.birthDate) member.birthDate = updates.birthDate;
       if (updates.maritalStatus) member.maritalStatus = updates.maritalStatus;
       if (updates.spouseName !== undefined)
         member.spouseName = updates.spouseName.trim();
       if (updates.address) member.address = updates.address;
-      if (updates.password) member.password = updates.password;
+      if (updates.password && updates.password.trim())
+        member.password = updates.password.trim();
+
+      // Se houver cônjuge vinculado e o endereço mudou, atualiza o endereço do cônjuge também
+      let spouse: Member | null = null;
+      if (member.spouseMemberId && updates.address) {
+        spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
+        if (spouse) {
+          spouse.address = updates.address;
+        }
+      }
 
       writeLocalDb(db);
 
       if (supabase) {
         try {
-          await supabase
-            .from("members")
-            .upsert(mapMemberToRow(member), { onConflict: "id" });
+          const toUpsert = [mapMemberToRow(member)];
+          if (spouse) toUpsert.push(mapMemberToRow(spouse));
+          await supabase.from("members").upsert(toUpsert, { onConflict: "id" });
         } catch (supaErr) {
           console.error("Erro ao atualizar membro no Supabase:", supaErr);
         }
       }
 
-      return NextResponse.json({ ok: true, member });
+      const updatedSession = {
+        id: member.id,
+        name: member.name,
+        email: member.email || "",
+        cpf: member.cpf || "",
+        phone: member.phone,
+        familyId: member.familyId,
+      };
+
+      return NextResponse.json({ ok: true, member, session: updatedSession });
     }
 
     // 4. VINCULAR CÔNJUGE (Por CPF ou E-mail do cônjuge)

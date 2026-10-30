@@ -138,6 +138,25 @@ export default function PortalDoMembroPage() {
   const [visitSuccessProtocol, setVisitSuccessProtocol] = useState<string | null>(null);
   const [visitError, setVisitError] = useState<string | null>(null);
 
+  // Edição de Perfil / Cadastro do Membro
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editMaritalStatus, setEditMaritalStatus] = useState<MaritalStatus>("Casado(a)");
+  const [editSpouseName, setEditSpouseName] = useState("");
+  const [editStreet, setEditStreet] = useState("");
+  const [editNumber, setEditNumber] = useState("");
+  const [editComplement, setEditComplement] = useState("");
+  const [editNeighborhood, setEditNeighborhood] = useState("");
+  const [editCity, setEditCity] = useState("Mogi das Cruzes");
+  const [editPassword, setEditPassword] = useState("");
+  const [editPasswordConfirm, setEditPasswordConfirm] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   // Carrega sessão salva no localStorage
   useEffect(() => {
     try {
@@ -461,6 +480,106 @@ export default function PortalDoMembroPage() {
       setVisitError(err instanceof Error ? err.message : "Erro ao solicitar visita.");
     } finally {
       setIsSubmittingVisit(false);
+    }
+  };
+
+  const startEditingProfile = () => {
+    if (!memberData) return;
+    setEditName(memberData.name || "");
+    setEditEmail(memberData.email || "");
+    setEditPhone(memberData.phone ? formatPhoneBR(memberData.phone) : "");
+    setEditBirthDate(memberData.birthDate || "");
+    setEditMaritalStatus((memberData.maritalStatus as MaritalStatus) || "Casado(a)");
+    setEditSpouseName(memberData.spouseName || "");
+    setEditStreet(memberData.address?.street || "");
+    setEditNumber(memberData.address?.number || "");
+    setEditComplement(memberData.address?.complement || "");
+    setEditNeighborhood(memberData.address?.neighborhood || "");
+    setEditCity(memberData.address?.city || "Mogi das Cruzes");
+    setEditPassword("");
+    setEditPasswordConfirm("");
+    setEditError(null);
+    setEditSuccess(null);
+    setIsEditingProfile(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session || !memberData) return;
+    setEditError(null);
+    setEditSuccess(null);
+
+    if (!editName.trim()) {
+      setEditError("O nome completo é obrigatório.");
+      return;
+    }
+    if (!editPhone.trim()) {
+      setEditError("O telefone/WhatsApp é obrigatório.");
+      return;
+    }
+
+    if (editPassword) {
+      if (editPassword.length < 4) {
+        setEditError("A nova senha deve ter no mínimo 4 dígitos.");
+        return;
+      }
+      if (editPassword !== editPasswordConfirm) {
+        setEditError("A confirmação da nova senha não confere.");
+        return;
+      }
+    }
+
+    setIsSavingEdit(true);
+
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "MEMBER_UPDATE_PROFILE",
+          payload: {
+            memberId: session.id,
+            updates: {
+              name: editName.trim(),
+              email: editEmail.trim(),
+              phone: editPhone.trim(),
+              birthDate: editBirthDate || undefined,
+              maritalStatus: editMaritalStatus,
+              spouseName: editMaritalStatus === "Casado(a)" ? editSpouseName.trim() : "",
+              address: {
+                street: editStreet.trim(),
+                number: editNumber.trim(),
+                complement: editComplement.trim(),
+                neighborhood: editNeighborhood.trim(),
+                city: editCity.trim() || "Mogi das Cruzes",
+              },
+              password: editPassword.trim() || undefined,
+            },
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao atualizar dados cadastrais.");
+      }
+
+      setMemberData(data.member);
+      if (data.session) {
+        setSession(data.session);
+        try {
+          window.localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(data.session));
+        } catch {
+          // ignore
+        }
+      }
+
+      setIsEditingProfile(false);
+      setEditSuccess("Cadastro atualizado com sucesso!");
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao atualizar cadastro.");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -1564,75 +1683,361 @@ export default function PortalDoMembroPage() {
            =================================================================== */}
         {activeTab === "meu-cadastro" && memberData && (
           <div className="max-w-2xl mx-auto rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-xl border border-[#252525]/15 space-y-6">
-            <div className="pb-3 border-b border-[#252525]/15">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
-                Dados Cadastrais
-              </span>
-              <h2 className="text-2xl font-black uppercase text-[#252525]">
-                Meu Perfil de Membro
-              </h2>
+            <div className="pb-3 border-b border-[#252525]/15 flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
+                  Dados Cadastrais
+                </span>
+                <h2 className="text-2xl font-black uppercase text-[#252525]">
+                  Meu Perfil de Membro
+                </h2>
+              </div>
+
+              {!isEditingProfile && (
+                <button
+                  type="button"
+                  onClick={startEditingProfile}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow"
+                >
+                  <Edit3 className="w-4 h-4 text-[#EBD57B]" />
+                  <span>Editar Cadastro</span>
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  Nome Completo
-                </span>
-                <strong className="text-sm font-black">{memberData.name}</strong>
+            {editSuccess && (
+              <div className="p-3.5 rounded-xl bg-[#E8F3EB] border border-[#2D7A46]/30 text-[#2D7A46] text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{editSuccess}</span>
               </div>
+            )}
 
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  CPF (Chave Única)
-                </span>
-                <strong className="text-sm font-black">{formatCPF(memberData.cpf)}</strong>
-              </div>
+            {!isEditingProfile ? (
+              /* MODO VISUALIZAÇÃO */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    Nome Completo
+                  </span>
+                  <strong className="text-sm font-black">{memberData.name}</strong>
+                </div>
 
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  E-mail de Acesso
-                </span>
-                <strong className="text-sm font-black">{memberData.email || "Não informado"}</strong>
-              </div>
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    CPF (Chave Única)
+                  </span>
+                  <strong className="text-sm font-black">{formatCPF(memberData.cpf)}</strong>
+                </div>
 
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  Telefone / WhatsApp
-                </span>
-                <strong className="text-sm font-black">{memberData.phone}</strong>
-              </div>
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    E-mail de Acesso
+                  </span>
+                  <strong className="text-sm font-black">{memberData.email || "Não informado"}</strong>
+                </div>
 
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  Data de Nascimento
-                </span>
-                <strong className="text-sm font-black">
-                  {formatDateBR(memberData.birthDate)}{" "}
-                  {calculateAge(memberData.birthDate)
-                    ? `(${calculateAge(memberData.birthDate)} anos)`
-                    : ""}
-                </strong>
-              </div>
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    Telefone / WhatsApp
+                  </span>
+                  <strong className="text-sm font-black">{memberData.phone}</strong>
+                </div>
 
-              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  Estado Civil
-                </span>
-                <strong className="text-sm font-black">
-                  {memberData.maritalStatus || "Não informado"}
-                  {memberData.spouseName ? ` • ${memberData.spouseName}` : ""}
-                </strong>
-              </div>
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    Data de Nascimento
+                  </span>
+                  <strong className="text-sm font-black">
+                    {formatDateBR(memberData.birthDate)}{" "}
+                    {calculateAge(memberData.birthDate)
+                      ? `(${calculateAge(memberData.birthDate)} anos)`
+                      : ""}
+                  </strong>
+                </div>
 
-              <div className="sm:col-span-2 p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                  Endereço Residencial
-                </span>
-                <strong className="text-sm font-black">{formatAddress(memberData.address)}</strong>
+                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    Estado Civil
+                  </span>
+                  <strong className="text-sm font-black">
+                    {memberData.maritalStatus || "Não informado"}
+                    {memberData.spouseName ? ` • ${memberData.spouseName}` : ""}
+                  </strong>
+                </div>
+
+                <div className="sm:col-span-2 p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                    Endereço Residencial
+                  </span>
+                  <strong className="text-sm font-black">{formatAddress(memberData.address)}</strong>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* MODO EDIÇÃO */
+              <form onSubmit={handleSaveProfile} className="space-y-5 text-xs font-semibold text-[#252525]">
+                {editError && (
+                  <div className="p-3.5 rounded-xl bg-[#F9EAE8] border border-[#CB4B3B] text-[#A93829] font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Seu nome completo"
+                    className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                      CPF (Chave Única)
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={formatCPF(memberData.cpf)}
+                      className="w-full rounded-xl border border-[#252525]/15 bg-[#252525]/5 p-3 text-sm font-bold text-[#252525]/60 cursor-not-allowed"
+                      title="O CPF não pode ser alterado por ser sua chave única oficial."
+                    />
+                    <span className="block text-[10px] text-[#252525]/50 mt-1">
+                      Chave única inalterável.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                      E-mail de Acesso *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="seu.email@exemplo.com"
+                      className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                      Telefone / WhatsApp *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(formatPhoneBR(e.target.value))}
+                      placeholder="(11) 99999-9999"
+                      maxLength={15}
+                      className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                      Data de Nascimento
+                    </label>
+                    <input
+                      type="date"
+                      value={editBirthDate}
+                      onChange={(e) => setEditBirthDate(e.target.value)}
+                      className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                      Estado Civil
+                    </label>
+                    <select
+                      value={editMaritalStatus}
+                      onChange={(e) => setEditMaritalStatus(e.target.value as MaritalStatus)}
+                      className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                    >
+                      {MARITAL_STATUS.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {editMaritalStatus === "Casado(a)" && (
+                    <div>
+                      <label className="block text-xs font-black uppercase tracking-wider mb-1">
+                        Nome do Cônjuge
+                      </label>
+                      <input
+                        type="text"
+                        value={editSpouseName}
+                        onChange={(e) => setEditSpouseName(e.target.value)}
+                        placeholder="Nome do esposo(a)"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-3 text-sm font-semibold"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* ENDEREÇO RESIDENCIAL */}
+                <div className="pt-3 border-t border-[#252525]/15 space-y-3">
+                  <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                    Endereço Residencial
+                  </span>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Logradouro (Rua / Av.)
+                      </label>
+                      <input
+                        type="text"
+                        value={editStreet}
+                        onChange={(e) => setEditStreet(e.target.value)}
+                        placeholder="Ex: Rua das Flores"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Número
+                      </label>
+                      <input
+                        type="text"
+                        value={editNumber}
+                        onChange={(e) => setEditNumber(e.target.value)}
+                        placeholder="123"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Complemento
+                      </label>
+                      <input
+                        type="text"
+                        value={editComplement}
+                        onChange={(e) => setEditComplement(e.target.value)}
+                        placeholder="Apto 42, Bloco B"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Bairro
+                      </label>
+                      <input
+                        type="text"
+                        value={editNeighborhood}
+                        onChange={(e) => setEditNeighborhood(e.target.value)}
+                        placeholder="Centro"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Cidade
+                      </label>
+                      <input
+                        type="text"
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        placeholder="Mogi das Cruzes"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEGURANÇA / ALTERAR SENHA */}
+                <div className="pt-3 border-t border-[#252525]/15 space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <Lock className="w-4 h-4 text-[#CB4B3B]" />
+                    <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                      Alterar Senha de Acesso (Opcional)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#252525]/70">
+                    Preencha apenas se desejar trocar a senha cadastrada. Caso contrário, deixe os campos em branco.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Nova Senha
+                      </label>
+                      <input
+                        type="password"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="Mínimo 4 dígitos"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
+                        Confirmar Nova Senha
+                      </label>
+                      <input
+                        type="password"
+                        value={editPasswordConfirm}
+                        onChange={(e) => setEditPasswordConfirm(e.target.value)}
+                        placeholder="Repita a nova senha"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-sm font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* BOTÕES DE AÇÃO */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#252525]/15">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingProfile(false);
+                      setEditError(null);
+                    }}
+                    disabled={isSavingEdit}
+                    className="px-5 py-2.5 rounded-xl bg-[#DCDACF] hover:bg-[#C7C4B5] text-[#252525] text-xs font-black uppercase tracking-wider transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="px-6 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors flex items-center gap-1.5"
+                  >
+                    {isSavingEdit ? (
+                      <>Salvando...</>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Salvar Alterações
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
+
       </main>
 
       {/* MODAL: ADICIONAR FILHO / DEPENDENTE (< 16 ANOS) */}
