@@ -383,7 +383,7 @@ export default function PortalDoMembroPage() {
           action: "MEMBER_UPDATE_MINISTRIES",
           payload: {
             memberId: session.id,
-            currentMinistries: myCurrentMinistries,
+            currentMinistries: memberData?.currentMinistries || myCurrentMinistries || [],
             interestedMinistries: myInterestedMinistries,
           },
         }),
@@ -400,7 +400,7 @@ export default function PortalDoMembroPage() {
       }
       setMinistryFeedback({
         type: "success",
-        text: "Ministérios e áreas de interesse atualizados com sucesso!",
+        text: "Que bênção! Seu interesse em servir foi registrado com sucesso. Nossa liderança entrará em contato com muito carinho!",
       });
     } catch (err) {
       setMinistryFeedback({
@@ -1986,8 +1986,8 @@ export default function PortalDoMembroPage() {
             if (!session.isAdmin && !session.isPastor) {
               tabs.push({
                 id: "ministerios",
-                label: "Ministérios",
-                icon: Sparkles,
+                label: "Quero Servir",
+                icon: HeartHandshake,
               });
             }
 
@@ -2820,7 +2820,7 @@ export default function PortalDoMembroPage() {
                       onClick={() => setActiveTab("ministerios")}
                       className="text-[11px] font-bold text-[#CB4B3B] hover:underline"
                     >
-                      Gerenciar na Aba Ministérios →
+                      Aba Quero Servir (Novos Ministérios) →
                     </button>
                   </div>
 
@@ -3677,18 +3677,18 @@ export default function PortalDoMembroPage() {
                   Corpo de Cristo em Ação
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#252525] mt-1">
-                  Ministérios & Voluntariado
+                  Ministérios & Quero Servir
                 </h2>
-                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1">
+                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1 max-w-2xl">
                   {session.isAdmin || session.isPastor
-                    ? "Gerencie as equipes ministeriais, veja voluntários atuantes e responda a pessoas interessadas em servir."
-                    : "Descubra os ministérios da Igreja do Alto, atualize onde você serve e indique as áreas em que deseja participar."}
+                    ? "Gerencie as equipes ministeriais, veja voluntários atuantes e responda com carinho aos membros interessados em servir."
+                    : "Você sente o desejo de servir a Deus na igreja mas não sabia como começar ou tinha vergonha de falar com alguém? Este espaço foi feito para você dar esse passo com toda tranquilidade!"}
                 </p>
               </div>
 
-              {/* Se for Pastor ou Admin: seletor de visualização (Relatório vs Meu Formulário) */}
+              {/* Se for Pastor ou Admin: seletor de visualização (Relatório vs Formulário de Interesse) */}
               {(session.isAdmin || session.isPastor) && (
-                <div className="flex bg-[#252525] p-1.5 rounded-2xl gap-1">
+                <div className="flex bg-[#252525] p-1.5 rounded-2xl gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => setMinistryViewMode("relatorio")}
@@ -3709,7 +3709,7 @@ export default function PortalDoMembroPage() {
                         : "text-[#DCDACF]/70 hover:text-white"
                     }`}
                   >
-                    Meu Envolvimento Pessoal
+                    Formulário Quero Servir
                   </button>
                 </div>
               )}
@@ -4008,109 +4008,58 @@ export default function PortalDoMembroPage() {
                 )}
               </div>
             ) : (
-              /* MODO 2: FORMULÁRIO PESSOAL DE MINISTÉRIOS (DO MEMBRO) */
+              /* MODO 2: FORMULÁRIO PARA ATRAIR NOVOS VOLUNTÁRIOS */
               <form onSubmit={handleSaveMinistries} className="space-y-6">
-                {/* SEÇÃO 1: MINISTÉRIOS EM QUE JÁ ATUA */}
-                <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-[#252525]/15 flex-wrap gap-2">
-                    <div>
-                      <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
-                        1. Atuação Atual
-                      </span>
-                      <h3 className="text-lg sm:text-xl font-black uppercase text-[#252525]">
-                        Ministérios em que você já atua atualmente
-                      </h3>
-                      <p className="text-xs text-[#252525]/70 mt-0.5">
-                        Marque as áreas onde você já serve ativamente na nossa igreja.
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider border border-emerald-300">
-                      {myCurrentMinistries.length} selecionado(s)
-                    </span>
+                {/* Banner de Acolhimento e Encorajamento */}
+                <div className="rounded-3xl bg-gradient-to-br from-[#252525] to-[#383838] text-[#DCDACF] p-6 sm:p-8 shadow-md border border-[#252525] relative overflow-hidden">
+                  <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-6 translate-y-6">
+                    <HeartHandshake className="w-48 h-48 text-white" />
                   </div>
-
-                  <div className="space-y-4">
-                    {CHURCH_MINISTRIES.map((group) => (
-                      <div key={`cur-${group.category}`} className="space-y-2">
-                        <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
-                          {group.category}
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {group.items.map((item) => {
-                            const isChecked = myCurrentMinistries.includes(item.id);
-                            return (
-                              <button
-                                key={`cur-${item.id}`}
-                                type="button"
-                                onClick={() => {
-                                  setMyCurrentMinistries((prev) =>
-                                    isChecked
-                                      ? prev.filter((m) => m !== item.id)
-                                      : [...prev, item.id]
-                                  );
-                                }}
-                                className={`flex items-start gap-2.5 p-3 rounded-2xl border-2 text-left transition-all ${
-                                  isChecked
-                                    ? "border-emerald-600 bg-white shadow-sm ring-1 ring-emerald-600"
-                                    : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/85"
-                                }`}
-                              >
-                                <div
-                                  className={`w-4 h-4 mt-0.5 rounded-md border flex items-center justify-center shrink-0 ${
-                                    isChecked
-                                      ? "bg-emerald-600 border-emerald-600 text-white"
-                                      : "border-[#252525]/40 bg-white"
-                                  }`}
-                                >
-                                  {isChecked && <Check className="w-3 h-3" />}
-                                </div>
-                                <div>
-                                  <span className="block text-xs font-bold leading-snug text-[#252525]">
-                                    {item.label}
-                                  </span>
-                                  {item.description && (
-                                    <span className="block text-[10px] text-[#252525]/60 mt-0.5 leading-tight">
-                                      {item.description}
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="relative z-10 space-y-3 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#EBD57B] text-xs font-bold uppercase tracking-wider border border-white/15">
+                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <span>Voluntariado com Propósito</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
+                      Seu dom faz a diferença na Casa do Alto!
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#DCDACF]/85 leading-relaxed">
+                      Servir é uma das formas mais lindas de viver a comunhão e exercer o amor de Cristo. Mesmo que você nunca tenha servido em uma igreja ou ache que precisa de experiência prévia, nós oferecemos todo treinamento, cuidado e acompanhamento com carinho.
+                    </p>
+                    <p className="text-xs text-[#EBD57B] font-bold">
+                      💡 Marque abaixo as áreas onde você tem vontade ou curiosidade de servir (pode marcar mais de uma). A liderança entrará em contato com você com todo acolhimento para conversar!
+                    </p>
                   </div>
                 </div>
 
-                {/* SEÇÃO 2: MINISTÉRIOS COM INTERESSE EM SERVIR */}
-                <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-[#252525]/15 flex-wrap gap-2">
+                {/* Card de Seleção dos Ministérios de Interesse */}
+                <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border border-[#252525]/15 space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#252525]/15 flex-wrap gap-2">
                     <div>
                       <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
-                        2. Desejo de Servir
+                        Onde você gostaria de servir?
                       </span>
-                      <h3 className="text-lg sm:text-xl font-black uppercase text-[#252525]">
-                        Ministérios em que você tem interesse em participar / servir
+                      <h3 className="text-lg sm:text-xl font-black uppercase text-[#252525] mt-0.5">
+                        Escolha uma ou mais áreas de interesse
                       </h3>
                       <p className="text-xs text-[#252525]/70 mt-0.5">
-                        Indique as áreas onde você gostaria de começar a servir. Pode escolher mais de uma opção.
+                        Você pode selecionar quantas áreas quiser. Sem pressão — apenas para nos conhecermos!
                       </p>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-wider border border-amber-300">
-                      {myInterestedMinistries.length} selecionado(s)
+                    <span className="px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-wider border border-amber-300">
+                      {myInterestedMinistries.length} área(s) selecionada(s)
                     </span>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {CHURCH_MINISTRIES.map((group) => {
                       const isLouvorGroup = group.category === "Ministério de Louvor";
                       return (
-                        <div key={`int-${group.category}`} className="space-y-2">
-                          <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                        <div key={`int-${group.category}`} className="space-y-3">
+                          <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B] border-b border-[#252525]/10 pb-1">
                             {group.category}
                           </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                             {group.items.map((item) => {
                               const isChecked = myInterestedMinistries.includes(item.id);
                               return (
@@ -4124,33 +4073,33 @@ export default function PortalDoMembroPage() {
                                         : [...prev, item.id]
                                     );
                                   }}
-                                  className={`flex items-start gap-2.5 p-3 rounded-2xl border-2 text-left transition-all ${
+                                  className={`flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition-all ${
                                     isChecked
-                                      ? "border-amber-600 bg-white shadow-sm ring-1 ring-amber-600"
-                                      : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/85"
+                                      ? "border-amber-600 bg-white shadow-sm ring-2 ring-amber-600/30"
+                                      : "border-[#252525]/15 bg-white/70 hover:bg-white text-[#252525]/85"
                                   }`}
                                 >
                                   <div
-                                    className={`w-4 h-4 mt-0.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                    className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 ${
                                       isChecked
                                         ? "bg-amber-600 border-amber-600 text-white"
-                                        : "border-[#252525]/40 bg-white"
+                                        : "border-[#252525]/30 bg-white"
                                     }`}
                                   >
-                                    {isChecked && <Star className="w-3 h-3 fill-white" />}
+                                    {isChecked && <Star className="w-3.5 h-3.5 fill-white" />}
                                   </div>
-                                  <div>
-                                    <span className="block text-xs font-bold leading-snug text-[#252525]">
+                                  <div className="space-y-0.5">
+                                    <span className="block text-xs sm:text-sm font-bold leading-snug text-[#252525]">
                                       {item.label}
                                     </span>
                                     {item.description && (
-                                      <span className="block text-[10px] text-[#252525]/60 mt-0.5 leading-tight">
+                                      <span className="block text-[11px] text-[#252525]/65 leading-tight">
                                         {item.description}
                                       </span>
                                     )}
                                     {item.requiresAudition && (
-                                      <span className="inline-block mt-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                                        Mediante audição
+                                      <span className="inline-block mt-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                        Entrada mediante audição
                                       </span>
                                     )}
                                   </div>
@@ -4161,14 +4110,14 @@ export default function PortalDoMembroPage() {
 
                           {/* Observação Exclusiva do Louvor no Fim */}
                           {isLouvorGroup && (
-                            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-2.5 mt-2">
+                            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-amber-950 flex items-start gap-3 mt-2">
                               <Music className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                               <div className="text-xs leading-relaxed">
-                                <strong className="font-bold block">
-                                  Observação importante para o Ministério de Louvor:
+                                <strong className="font-bold block text-amber-900">
+                                  Observação para o Ministério de Louvor:
                                 </strong>
                                 <span>
-                                  O ingresso no ministério de Louvor é mediante audição e aprovação com a liderança musical da igreja. Ao marcar seu interesse, a equipe entrará em contato para agendar seu teste vocal ou instrumental.
+                                  O ingresso no ministério de Louvor é realizado mediante uma breve audição musical com a nossa equipe de louvor. Ao marcar seu interesse, nossa liderança musical agendará um momento agradável para ouvir você cantar ou tocar!
                                 </span>
                               </div>
                             </div>
@@ -4178,22 +4127,22 @@ export default function PortalDoMembroPage() {
                     })}
                   </div>
 
-                  <div className="pt-4 border-t border-[#252525]/15 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-[#252525]/75">
-                      Suas respostas ajudam os pastores a direcionar os chamados ministeriais na igreja.
+                  <div className="pt-5 border-t border-[#252525]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <span className="text-xs font-semibold text-[#252525]/75 text-center sm:text-left">
+                      Ao salvar, seus dados e interesses são registrados com segurança para os pastores e líderes ministeriais da igreja.
                     </span>
 
                     <button
                       type="submit"
                       disabled={isSavingMinistries}
-                      className="w-full sm:w-auto px-8 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs sm:text-sm font-black uppercase tracking-wider shadow-md transition-colors flex items-center justify-center gap-2 shrink-0"
                     >
                       {isSavingMinistries ? (
-                        <span>Salvando preferências...</span>
+                        <span>Enviando seu interesse...</span>
                       ) : (
                         <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Salvar Meus Ministérios & Interesses</span>
+                          <HeartHandshake className="w-4 h-4" />
+                          <span>Quero Servir nestes Ministérios</span>
                         </>
                       )}
                     </button>
