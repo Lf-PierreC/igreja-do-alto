@@ -44,6 +44,7 @@ import {
   Trash2,
   FileText,
   PlusCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface NovaVisitaFormTabProps {
@@ -662,8 +663,7 @@ export function NovaVisitaFormTab({
                   htmlFor="linked-request"
                   className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B] mb-1"
                 >
-                  Atender Solicitação da Fila (Opcional — preenche os dados
-                  automaticamente)
+                  Selecione a solicitação de visita correspondente4
                 </label>
                 <select
                   id="linked-request"
@@ -707,7 +707,7 @@ export function NovaVisitaFormTab({
                     }`}
                   >
                     <Users className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                    Buscar / Selecionar Cadastrada
+                    Membro Cadastrado / Família
                   </button>
                   <button
                     type="button"
@@ -722,7 +722,7 @@ export function NovaVisitaFormTab({
                     }`}
                   >
                     <UserPlus className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                    Digitar Nova Pessoa/Família
+                    Visitante Não Cadastrado
                   </button>
                 </div>
               </div>
@@ -883,19 +883,32 @@ export function NovaVisitaFormTab({
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border-2 border-[#252525]/15">
-                  <div className="sm:col-span-3">
-                    <input
-                      type="text"
-                      id="new-member-name"
-                      name="newMemberName"
-                      required={mode === "new"}
-                      value={newMemberName}
-                      onChange={(e) => setNewMemberName(e.target.value)}
-                      placeholder="Digite o nome da pessoa ou família visitada *"
-                      className="w-full rounded-xl border-2 border-[#252525]/25 px-4 py-3 font-medium"
-                    />
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-[#CB4B3B]/10 border border-[#CB4B3B]/30 flex items-start gap-2.5 text-xs text-[#252525]">
+                    <Sparkles className="w-4 h-4 text-[#CB4B3B] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-black uppercase text-[#CB4B3B]">
+                        Visitante / Não Cadastrado:
+                      </strong>
+                      <span>
+                        Ao registrar o WhatsApp do visitante, quando essa pessoa criar o cadastro oficial no <strong>Portal do Membro</strong> (membros.igrejadoalto.com), esta visita será <strong>unificada automaticamente</strong> ao histórico oficial dela.
+                      </span>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border-2 border-[#252525]/15">
+                    <div className="sm:col-span-3">
+                      <input
+                        type="text"
+                        id="new-member-name"
+                        name="newMemberName"
+                        required={mode === "new"}
+                        value={newMemberName}
+                        onChange={(e) => setNewMemberName(e.target.value)}
+                        placeholder="Digite o nome da pessoa ou família visitada *"
+                        className="w-full rounded-xl border-2 border-[#252525]/25 px-4 py-3 font-medium"
+                      />
+                    </div>
                   <div>
                     <label
                       htmlFor="new-member-phone"
@@ -948,7 +961,8 @@ export function NovaVisitaFormTab({
                     />
                   </div>
                 </div>
-              )}
+              </div>
+            )}
             </div>
 
             {/* Data da visita * & Horário aproximado de início e de término */}

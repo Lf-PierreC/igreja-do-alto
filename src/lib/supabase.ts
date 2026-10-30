@@ -97,7 +97,22 @@ export function mapPastorToRow(p: PastorLeader) {
   };
 }
 
+const MEMBER_PORTAL_REGEX = /\n?\[\[MEMBER_PORTAL:([\s\S]+?)\]\]$/;
+
 export function mapRowToMember(row: Record<string, any>): Member {
+  const rawNotes: string = row.notes || "";
+  const match = rawNotes.match(MEMBER_PORTAL_REGEX);
+  let portalData: Record<string, any> = {};
+  if (match) {
+    try {
+      portalData = JSON.parse(match[1]);
+    } catch {
+      // ignore
+    }
+  }
+
+  const cleanNotes = rawNotes.replace(MEMBER_PORTAL_REGEX, "").trim();
+
   return {
     id: row.id,
     name: row.name,
@@ -127,11 +142,53 @@ export function mapRowToMember(row: Record<string, any>): Member {
     nextStep: row.next_step ?? undefined,
     followUpResponsible: row.follow_up_responsible ?? undefined,
     leadershipAlert: row.leadership_alert ?? null,
-    notes: row.notes ?? undefined,
+    notes: cleanNotes || undefined,
+
+    // Campos do Portal do Membro & Núcleo Familiar
+    cpf: row.cpf || portalData.cpf || undefined,
+    email: row.email || portalData.email || undefined,
+    password: row.password || portalData.password || undefined,
+    isOfficialMember: row.is_official_member ?? portalData.isOfficialMember ?? false,
+    familyId: row.family_id || portalData.familyId || undefined,
+    familyRole: row.family_role || portalData.familyRole || undefined,
+    spouseMemberId: row.spouse_member_id || portalData.spouseMemberId || undefined,
+    dependents: Array.isArray(row.dependents)
+      ? row.dependents
+      : Array.isArray(portalData.dependents)
+      ? portalData.dependents
+      : [],
   };
 }
 
 export function mapMemberToRow(m: Member) {
+  const baseNotes = (m.notes || "").replace(MEMBER_PORTAL_REGEX, "").trim();
+  const hasPortalData =
+    m.cpf ||
+    m.email ||
+    m.password ||
+    m.isOfficialMember ||
+    m.familyId ||
+    m.familyRole ||
+    m.spouseMemberId ||
+    (m.dependents && m.dependents.length > 0);
+
+  let finalNotes: string | null = baseNotes || null;
+  if (hasPortalData) {
+    const portalPayload = {
+      cpf: m.cpf || null,
+      email: m.email || null,
+      password: m.password || null,
+      isOfficialMember: m.isOfficialMember ?? true,
+      familyId: m.familyId || null,
+      familyRole: m.familyRole || null,
+      spouseMemberId: m.spouseMemberId || null,
+      dependents: m.dependents || [],
+    };
+    finalNotes = `${baseNotes ? `${baseNotes}\n` : ""}[[MEMBER_PORTAL:${JSON.stringify(
+      portalPayload
+    )}]]`;
+  }
+
   return {
     id: m.id,
     name: m.name,
@@ -156,7 +213,7 @@ export function mapMemberToRow(m: Member) {
     next_step: m.nextStep ?? null,
     follow_up_responsible: m.followUpResponsible ?? null,
     leadership_alert: m.leadershipAlert ?? null,
-    notes: m.notes ?? null,
+    notes: finalNotes,
     updated_at: new Date().toISOString(),
   };
 }

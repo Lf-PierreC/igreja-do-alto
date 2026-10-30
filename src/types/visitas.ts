@@ -51,7 +51,36 @@ export interface Address {
   city: string;
 }
 
-/** Cadastro da pessoa/família (alimentado pela solicitação e pelos relatórios). */
+export interface FamilyDependent {
+  id: string;
+  fullName: string;
+  birthDate: string; // YYYY-MM-DD
+  gender?: "M" | "F";
+  relationship: "Filho(a)" | "Enteado(a)" | "Neto(a)" | "Outro";
+  notes?: string; // ex: restrições alimentares, ministério infantil
+  cpf?: string; // opcional para menores de 16 anos
+  registeredAt: string;
+}
+
+export interface Family {
+  id: string;
+  familyName: string;
+  titularMemberId: string;
+  spouseMemberId?: string;
+  address?: Address;
+  createdAt: string;
+}
+
+export interface MemberSession {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string;
+  phone: string;
+  familyId?: string;
+}
+
+/** Cadastro da pessoa/família (alimentado pela solicitação, portal do membro e pelos relatórios). */
 export interface Member {
   id: string;
   name: string;
@@ -81,6 +110,16 @@ export interface Member {
   /** Última comunicação à liderança pastoral ("Sim" ou "Urgente"). */
   leadershipAlert?: Exclude<LeadershipComm, "Não"> | null;
   notes?: string;
+
+  // Campos específicos do Portal do Membro & Núcleo Familiar
+  cpf?: string; // CPF único (11 dígitos numéricos limpos)
+  email?: string; // E-mail único de login do membro
+  password?: string; // Senha para o portal do membro
+  isOfficialMember?: boolean; // true = cadastrado no portal oficial; false = registro avulso
+  familyId?: string; // ID da família compartilhada com cônjuge e filhos
+  familyRole?: "titular" | "conjuge";
+  spouseMemberId?: string; // ID do membro com quem tem vínculo de cônjuge
+  dependents?: FamilyDependent[]; // Filhos e dependentes menores de 16 anos
 }
 
 /** 1. Formulário — Solicitação de Visita Pastoral */

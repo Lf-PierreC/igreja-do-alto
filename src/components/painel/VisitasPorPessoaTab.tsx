@@ -19,6 +19,7 @@ import {
 import { FOLLOW_UP_NEEDS, SITUATION_LEVELS } from "@/data/formOptions";
 import { LightDismissDialog } from "@/components/LightDismissDialog";
 import { PessoasPresetFilter } from "@/components/painel/DashboardTab";
+import { formatCPF } from "@/lib/cpfUtils";
 import {
   Users,
   Search,
@@ -33,6 +34,8 @@ import {
   RotateCcw,
   ChevronRight,
   X,
+  ShieldCheck,
+  Baby,
 } from "lucide-react";
 
 interface VisitasPorPessoaTabProps {
@@ -280,9 +283,22 @@ export function VisitasPorPessoaTab({
 
               <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
                 <div>
-                  <h2 className="text-xl sm:text-3xl font-black uppercase tracking-tight">
-                    {activeMember.name}
-                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h2 className="text-xl sm:text-3xl font-black uppercase tracking-tight">
+                      {activeMember.name}
+                    </h2>
+                    {activeMember.isOfficialMember ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-700/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        Membro Oficial (Portal)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#DCDACF]/20 text-[#DCDACF]/80 border border-[#DCDACF]/30 text-[10px] font-bold uppercase tracking-wider">
+                        Visitante / Não Cadastrado
+                      </span>
+                    )}
+                  </div>
+
                   <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[#DCDACF]/85 font-semibold mt-2">
                     <span className="inline-flex items-center gap-1.5">
                       <MapPin className="w-4 h-4 text-[#CB4B3B] shrink-0" />
@@ -292,7 +308,13 @@ export function VisitasPorPessoaTab({
                       <Phone className="w-4 h-4 text-[#CB4B3B] shrink-0" />
                       {activeMember.phone}
                     </span>
+                    {activeMember.cpf && (
+                      <span className="text-[#DCDACF]/75 font-bold">
+                        CPF: {formatCPF(activeMember.cpf)}
+                      </span>
+                    )}
                   </div>
+
                   {(activeMember.maritalStatus ||
                     activeMember.spouseName ||
                     activeMember.birthDate) && (
@@ -307,6 +329,29 @@ export function VisitasPorPessoaTab({
                       {activeMember.householdSize
                         ? ` • ${activeMember.householdSize} pessoa(s) na casa`
                         : ""}
+                    </div>
+                  )}
+
+                  {activeMember.dependents && activeMember.dependents.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-[#CB4B3B]">
+                        <Baby className="w-3.5 h-3.5" />
+                        Filhos/Dependentes:
+                      </span>
+                      {activeMember.dependents.map((dep) => {
+                        const age = calculateAge(dep.birthDate);
+                        return (
+                          <span
+                            key={dep.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#363636] border border-[#DCDACF]/15 text-[11px] font-bold text-[#DCDACF]"
+                          >
+                            <span>{dep.fullName}</span>
+                            <span className="text-[#CB4B3B] text-[10px]">
+                              ({age !== null ? `${age}a` : dep.relationship})
+                            </span>
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
