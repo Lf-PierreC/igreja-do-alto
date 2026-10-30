@@ -1903,9 +1903,7 @@ export default function PortalDoMembroPage() {
                   </span>
                 ) : null}
               </div>
-              <span className="block text-[11px] font-bold text-[#DCDACF]/70">
-                {session.cpf ? `CPF: ${formatCPF(session.cpf)}` : session.email || ""}
-              </span>
+             
             </div>
 
             <button
@@ -1920,7 +1918,14 @@ export default function PortalDoMembroPage() {
         </div>
 
         {/* Barra de Navegação das Abas do Membro */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <div
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+          className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 custom-scrollbar-dark scroll-smooth"
+        >
           {(() => {
             const tabs: {
               id: ActiveTab;
@@ -1931,12 +1936,12 @@ export default function PortalDoMembroPage() {
             if (session.isAdmin || session.isPastor) {
               tabs.push({
                 id: "todos-membros",
-                label: `Todos os Membros (${allMembers.length})`,
+                label: `Membros (${allMembers.length})`,
                 icon: Users,
               });
               tabs.push({
                 id: "ministerios",
-                label: "Ministérios & Voluntários",
+                label: "Voluntariado",
                 icon: Sparkles,
               });
             }
@@ -1944,14 +1949,14 @@ export default function PortalDoMembroPage() {
             if (session.isAdmin) {
               tabs.push({
                 id: "gestao-pastores",
-                label: `Gestão de Pastores (${pastorsList.length})`,
+                label: `Gestão de Equipe (${pastorsList.length})`,
                 icon: Crown,
               });
             }
 
             tabs.push({
               id: "familia",
-              label: `Minha Família (${dependents.length + (spouseData ? 2 : 1)})`,
+              label: `Família (${dependents.length + (spouseData ? 2 : 1)})`,
               icon: Home,
             });
 
