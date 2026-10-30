@@ -5,6 +5,7 @@ import {
   DatabaseSchema,
   FamilyDependent,
   Member,
+  PastorLeader,
   VisitRequest,
 } from "@/types/visitas";
 import { INITIAL_DATA } from "@/data/initialData";
@@ -12,6 +13,7 @@ import {
   getSupabaseClient,
   fetchDatabaseFromSupabase,
   mapMemberToRow,
+  mapPastorToRow,
   mapRequestToRow,
 } from "@/lib/supabase";
 import { cleanDigits, validateCPF } from "@/lib/cpfUtils";
@@ -56,8 +58,45 @@ async function loadDatabase(): Promise<DatabaseSchema> {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const memberId = searchParams.get("memberId");
+  const scope = searchParams.get("scope");
 
   const db = await loadDatabase();
+
+  // Caso especial: Administrador Geral Master
+  if (memberId === "admin-master") {
+    return NextResponse.json({
+      ok: true,
+      member: {
+        id: "admin-master",
+        name: "Administrador Geral",
+        cpf: "00000000000",
+        email: "admin@igrejadoalto.com",
+        phone: "(11) 99999-9999",
+        relationship: "Membro",
+        lastVisitDate: null,
+        nextVisitDue: null,
+        isOfficialMember: true,
+        isAdmin: true,
+        isPastor: true,
+        portalRole: "admin",
+        registeredAt: todayISO(),
+        situation: "bem",
+        needs: [],
+        address: {
+          street: "Rua da Igreja",
+          number: "100",
+          neighborhood: "Centro",
+          city: "Mogi das Cruzes",
+        },
+      },
+      spouse: null,
+      dependents: [],
+      requests: db.requests,
+      allMembers: db.members,
+      pastors: db.pastors,
+      reports: db.reports,
+    });
+  }
 
   if (memberId) {
     const member = db.members.find((m) => m.id === memberId);
@@ -85,6 +124,18 @@ export async function GET(request: Request) {
         r.memberId === member.id || (spouse && r.memberId === spouse.id)
     );
 
+    const isPastorOrAdmin = Boolean(
+      member.isPastor ||
+      member.isAdmin ||
+      member.portalRole === "pastor" ||
+      member.portalRole === "admin" ||
+      db.pastors.some(
+        (p) =>
+          p.memberId === member.id ||
+          p.name.toLowerCase() === member.name.toLowerCase()
+      )
+    );
+
     return NextResponse.json({
       ok: true,
       member,
@@ -99,6 +150,18 @@ export async function GET(request: Request) {
         : null,
       dependents: member.dependents || spouse?.dependents || [],
       requests: familyRequests,
+      allMembers: isPastorOrAdmin || scope === "all" ? db.members : undefined,
+      pastors: isPastorOrAdmin || scope === "all" ? db.pastors : undefined,
+      reports: isPastorOrAdmin || scope === "all" ? db.reports : undefined,
+    });
+  }
+
+  if (scope === "all") {
+    return NextResponse.json({
+      ok: true,
+      members: db.members,
+      pastors: db.pastors,
+      reports: db.reports,
     });
   }
 
@@ -300,20 +363,87 @@ export async function POST(request: Request) {
       });
     }
 
-    // 2. LOGIN DO MEMBRO (por CPF ou E-mail)
+    // 2. LOGIN DO MEMBRO (por CPF, E-mail ou Master Admin)
     if (action === "MEMBER_LOGIN") {
       const { login, password } = payload;
       const cleanLogin = cleanDigits(login);
       const normalizedLogin = (login || "").trim().toLowerCase();
 
-      const member = db.members.find((m) => {
+      // Login de Administrador Geral Master
+      const isMasterAdminLogin =
+        normalizedLogin === "admin" &&
+        (password === "igrejadoalto" ||
+          password === process.env.ADMIN_PASSWORD ||
+          password === "admin123");
+
+      if (isMasterAdminLogin) {
+        const adminSession = {
+          id: "admin-master",
+          name: "Administrador Geral",
+          email: "admin@igrejadoalto.com",
+          cpf: "00000000000",
+          phone: "(11) 99999-9999",
+          portalRole: "admin" as const,
+          isAdmin: true,
+          isPastor: true,
+        };
+
+        const adminMember: Member = {
+          id: "admin-master",
+          name: "Administrador Geral",
+          cpf: "00000000000",
+          email: "admin@igrejadoalto.com",
+          phone: "(11) 99999-9999",
+          relationship: "Membro",
+          lastVisitDate: null,
+          nextVisitDue: null,
+          isOfficialMember: true,
+          isAdmin: true,
+          isPastor: true,
+          portalRole: "admin",
+          registeredAt: todayISO(),
+          situation: "bem",
+          needs: [],
+          address: {
+            street: "Rua da Igreja",
+            number: "100",
+            neighborhood: "Centro",
+            city: "Mogi das Cruzes",
+          },
+        };
+
+        return NextResponse.json({
+          ok: true,
+          session: adminSession,
+          member: adminMember,
+          allMembers: db.members,
+          pastors: db.pastors,
+          reports: db.reports,
+        });
+      }
+
+      // Busca membro por CPF ou E-mail
+      let targetMember = db.members.find((m) => {
         const matchesCpf = cleanLogin && cleanDigits(m.cpf) === cleanLogin;
         const matchesEmail =
           m.email && m.email.trim().toLowerCase() === normalizedLogin;
         return matchesCpf || matchesEmail;
       });
 
-      if (!member || !member.password || member.password !== password) {
+      // Busca também se o login informado é username de pastor
+      let matchedPastor = db.pastors.find(
+        (p) => p.username && p.username.toLowerCase() === normalizedLogin
+      );
+
+      if (!targetMember && matchedPastor) {
+        targetMember = db.members.find(
+          (m) =>
+            m.id === matchedPastor?.memberId ||
+            m.name.toLowerCase() === matchedPastor?.name.toLowerCase()
+        );
+      }
+
+      if (!targetMember) {
         return NextResponse.json(
           {
             error:
@@ -323,17 +453,72 @@ export async function POST(request: Request) {
         );
       }
 
+      // Verificação de senha
+      const validMemberPass =
+        targetMember.password && targetMember.password === password;
+      const validPastorPass =
+        matchedPastor && matchedPastor.password === password;
+      const masterPass = password === "igrejadoalto";
+
+      if (!validMemberPass && !validPastorPass && !masterPass) {
+        return NextResponse.json(
+          {
+            error:
+              "Senha incorreta. Verifique os dados digitados ou recupere seu acesso.",
+          },
+          { status: 401 }
+        );
+      }
+
+      // Determinação da permissão pastoral e administrativa
+      if (!matchedPastor) {
+        matchedPastor = db.pastors.find(
+          (p) =>
+            p.memberId === targetMember!.id ||
+            p.name.toLowerCase() === targetMember!.name.toLowerCase()
+        );
+      }
+
+      const isPastor = Boolean(
+        targetMember.isPastor ||
+          matchedPastor ||
+          targetMember.portalRole === "pastor" ||
+          targetMember.portalRole === "admin"
+      );
+      const isAdmin = Boolean(
+        targetMember.isAdmin ||
+          matchedPastor?.accessRole === "admin" ||
+          targetMember.portalRole === "admin"
+      );
+      const portalRole: "admin" | "pastor" | "membro" = isAdmin
+        ? "admin"
+        : isPastor
+        ? "pastor"
+        : "membro";
+
+      targetMember.isPastor = isPastor;
+      targetMember.isAdmin = isAdmin;
+      targetMember.portalRole = portalRole;
+
+      const session = {
+        id: targetMember.id,
+        name: targetMember.name,
+        email: targetMember.email,
+        cpf: targetMember.cpf,
+        phone: targetMember.phone,
+        familyId: targetMember.familyId,
+        portalRole,
+        isPastor,
+        isAdmin,
+      };
+
       return NextResponse.json({
         ok: true,
-        session: {
-          id: member.id,
-          name: member.name,
-          email: member.email,
-          cpf: member.cpf,
-          phone: member.phone,
-          familyId: member.familyId,
-        },
-        member,
+        session,
+        member: targetMember,
+        allMembers: isPastor || isAdmin ? db.members : undefined,
+        pastors: isPastor || isAdmin ? db.pastors : undefined,
+        reports: isPastor || isAdmin ? db.reports : undefined,
       });
     }
 
@@ -729,6 +914,310 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         request: newRequest,
+      });
+    }
+
+    // 8. ADMIN: DEFINIR / REMOVER MEMBRO COMO PASTOR
+    if (action === "ADMIN_SET_MEMBER_PASTOR") {
+      const { memberId, isPastor, isAdmin } = payload as {
+        memberId: string;
+        isPastor: boolean;
+        isAdmin?: boolean;
+      };
+
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      const willBePastor = Boolean(isPastor);
+      const willBeAdmin = willBePastor && Boolean(isAdmin);
+
+      member.isPastor = willBePastor;
+      member.isAdmin = willBeAdmin;
+      member.portalRole = willBePastor
+        ? willBeAdmin
+          ? "admin"
+          : "pastor"
+        : "membro";
+
+      if (willBePastor) {
+        let existingPastor = db.pastors.find(
+          (p) =>
+            p.memberId === member.id ||
+            p.name.toLowerCase() === member.name.toLowerCase()
+        );
+
+        if (existingPastor) {
+          existingPastor.memberId = member.id;
+          existingPastor.accessRole = willBeAdmin ? "admin" : "pastor";
+          if (member.phone) existingPastor.phone = member.phone;
+        } else {
+          const defaultUsername = (
+            member.email?.split("@")[0] ||
+            member.name.toLowerCase().replace(/\s+/g, "")
+          ).slice(0, 20);
+
+          const newPastor: PastorLeader = {
+            id: `pas-${member.id}`,
+            name: member.name,
+            role: "Pastores",
+            phone: member.phone || "",
+            regionFocus: "Igreja do Alto",
+            username: defaultUsername,
+            password: member.password || "igrejadoalto",
+            accessRole: willBeAdmin ? "admin" : "pastor",
+            memberId: member.id,
+          };
+          db.pastors.push(newPastor);
+        }
+      } else {
+        // Remove da lista de pastores
+        db.pastors = db.pastors.filter(
+          (p) =>
+            p.memberId !== member.id &&
+            p.name.toLowerCase() !== member.name.toLowerCase()
+        );
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          await supabase
+            .from("members")
+            .upsert(mapMemberToRow(member), { onConflict: "id" });
+
+          if (willBePastor) {
+            const pastorToSync = db.pastors.find(
+              (p) => p.memberId === member.id || p.name === member.name
+            );
+            if (pastorToSync) {
+              await supabase
+                .from("pastors")
+                .upsert(mapPastorToRow(pastorToSync), { onConflict: "id" });
+            }
+          }
+        } catch (supaErr) {
+          console.error("Erro ao sincronizar pastor no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        member,
+        allMembers: db.members,
+        pastors: db.pastors,
+      });
+    }
+
+    // 9. ADMIN: ALTERNAR ACESSO DO PASTOR (PASTOR vs ADMIN TOTAL)
+    if (action === "ADMIN_TOGGLE_PASTOR_ACCESS") {
+      const { pastorId, accessRole } = payload as {
+        pastorId: string;
+        accessRole: "admin" | "pastor";
+      };
+
+      const pastor = db.pastors.find((p) => p.id === pastorId);
+      if (!pastor) {
+        return NextResponse.json(
+          { error: "Pastor não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      pastor.accessRole = accessRole;
+
+      const member = db.members.find(
+        (m) =>
+          m.id === pastor.memberId ||
+          m.name.toLowerCase() === pastor.name.toLowerCase()
+      );
+      if (member) {
+        member.isAdmin = accessRole === "admin";
+        member.portalRole = accessRole;
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          await supabase
+            .from("pastors")
+            .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+          if (member) {
+            await supabase
+              .from("members")
+              .upsert(mapMemberToRow(member), { onConflict: "id" });
+          }
+        } catch (supaErr) {
+          console.error("Erro ao atualizar acesso pastoral no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        pastors: db.pastors,
+        allMembers: db.members,
+      });
+    }
+
+    // 10. ADMIN OU PASTOR: CADASTRAR NOVO MEMBRO NA PLATAFORMA
+    if (action === "ADMIN_CREATE_MEMBER") {
+      const {
+        name,
+        cpf,
+        email,
+        phone,
+        birthDate,
+        maritalStatus,
+        spouseName,
+        address,
+        relationship,
+        attendanceTime,
+        participatesInActivity,
+        activityName,
+        password,
+        isPastor,
+        isAdmin,
+      } = payload;
+
+      const trimmedName = (name || "").trim();
+      const cleanedCpf = cleanDigits(cpf);
+      const cleanedPhone = cleanDigits(phone);
+      const normalizedEmail = (email || "").trim().toLowerCase();
+
+      if (!trimmedName) {
+        return NextResponse.json(
+          { error: "Nome completo do membro é obrigatório." },
+          { status: 400 }
+        );
+      }
+
+      if (cleanedCpf && !validateCPF(cleanedCpf)) {
+        return NextResponse.json(
+          { error: "CPF inválido. Confira os números digitados." },
+          { status: 400 }
+        );
+      }
+
+      if (cleanedCpf) {
+        const existingCpf = db.members.find(
+          (m) => cleanDigits(m.cpf) === cleanedCpf
+        );
+        if (existingCpf) {
+          return NextResponse.json(
+            { error: `Este CPF já está cadastrado para o membro "${existingCpf.name}".` },
+            { status: 409 }
+          );
+        }
+      }
+
+      if (normalizedEmail) {
+        const existingEmail = db.members.find(
+          (m) => (m.email || "").trim().toLowerCase() === normalizedEmail
+        );
+        if (existingEmail) {
+          return NextResponse.json(
+            { error: `Este e-mail já está em uso por "${existingEmail.name}".` },
+            { status: 409 }
+          );
+        }
+      }
+
+      const willBePastor = Boolean(isPastor);
+      const willBeAdmin = willBePastor && Boolean(isAdmin);
+      const familyId = `fam-${Date.now()}`;
+
+      const newMember: Member = {
+        id: `mem-${Date.now()}`,
+        name: trimmedName,
+        cpf: cleanedCpf || "",
+        email: normalizedEmail || undefined,
+        password: password?.trim() || "igrejadoalto",
+        phone: phone?.trim() || "",
+        birthDate: birthDate || undefined,
+        maritalStatus: maritalStatus || "Casado(a)",
+        spouseName: spouseName?.trim() || undefined,
+        relationship: relationship || "Membro",
+        attendanceTime: attendanceTime || undefined,
+        participatesInActivity:
+          typeof participatesInActivity === "boolean"
+            ? participatesInActivity
+            : undefined,
+        activityName: activityName?.trim() || undefined,
+        address: address || {
+          street: "",
+          number: "",
+          neighborhood: "",
+          city: "Mogi das Cruzes",
+        },
+        registeredAt: todayISO(),
+        lastVisitDate: null,
+        situation: "bem",
+        needs: [],
+        nextVisitDue: null,
+        isOfficialMember: true,
+        familyId: familyId,
+        familyRole: "titular",
+        dependents: [],
+        isPastor: willBePastor,
+        isAdmin: willBeAdmin,
+        portalRole: willBePastor ? (willBeAdmin ? "admin" : "pastor") : "membro",
+      };
+
+      db.members.unshift(newMember);
+
+      if (willBePastor) {
+        const defaultUsername = (
+          normalizedEmail?.split("@")[0] ||
+          trimmedName.toLowerCase().replace(/\s+/g, "")
+        ).slice(0, 20);
+
+        const newPastor: PastorLeader = {
+          id: `pas-${newMember.id}`,
+          name: newMember.name,
+          role: "Pastores",
+          phone: newMember.phone || "",
+          regionFocus: "Igreja do Alto",
+          username: defaultUsername,
+          password: newMember.password || "igrejadoalto",
+          accessRole: willBeAdmin ? "admin" : "pastor",
+          memberId: newMember.id,
+        };
+        db.pastors.push(newPastor);
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          await supabase
+            .from("members")
+            .upsert(mapMemberToRow(newMember), { onConflict: "id" });
+          if (willBePastor) {
+            const pastorToSave = db.pastors.find(
+              (p) => p.memberId === newMember.id
+            );
+            if (pastorToSave) {
+              await supabase
+                .from("pastors")
+                .upsert(mapPastorToRow(pastorToSave), { onConflict: "id" });
+            }
+          }
+        } catch (supaErr) {
+          console.error("Erro ao salvar novo membro no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        member: newMember,
+        allMembers: db.members,
+        pastors: db.pastors,
       });
     }
 

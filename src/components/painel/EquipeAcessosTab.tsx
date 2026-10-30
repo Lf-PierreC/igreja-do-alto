@@ -9,7 +9,6 @@ import {
 import { deriveDefaultUsername } from "@/lib/supabase";
 import {
   ShieldCheck,
-  UserPlus,
   Users,
   KeyRound,
   Eye,
@@ -32,14 +31,6 @@ export function EquipeAcessosTab({
   db,
   onDbUpdated,
 }: EquipeAcessosTabProps) {
-  const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
-  const [usernameTouched, setUsernameTouched] = useState(false);
-  const [password, setPassword] = useState("igrejadoalto");
-  const [phone, setPhone] = useState("");
-  const [roleTitle, setRoleTitle] = useState("Pastores");
-  const [accessRole, setAccessRole] = useState<UserAccessRole>("pastor");
-
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
@@ -55,82 +46,10 @@ export function EquipeAcessosTab({
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const handleNameChange = (val: string) => {
-    setName(val);
-    if (!usernameTouched) {
-      setUsername(deriveDefaultUsername(val));
-    }
-  };
-
   const copyText = (text: string, key: string) => {
     navigator.clipboard?.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const handleCreatePastor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFeedback(null);
-
-    if (!name.trim()) {
-      setFeedback({
-        type: "error",
-        text: "Informe o nome do pastor, casal pastoral ou administrador.",
-      });
-      return;
-    }
-
-    const finalUsername = (username.trim() || deriveDefaultUsername(name)).toLowerCase();
-    if (!finalUsername) {
-      setFeedback({
-        type: "error",
-        text: "Informe um usuário de login válido.",
-      });
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const res = await fetch("/api/dados", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "ADD_PASTOR",
-          payload: {
-            name: name.trim(),
-            role: roleTitle.trim() || "Pastores",
-            phone: phone.trim(),
-            regionFocus: "Igreja do Alto",
-            username: finalUsername,
-            password: password.trim() || "igrejadoalto",
-            accessRole,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.db) {
-        throw new Error(data.error || "Não foi possível salvar o cadastro.");
-      }
-
-      onDbUpdated(data.db);
-      setName("");
-      setUsername("");
-      setUsernameTouched(false);
-      setPassword("igrejadoalto");
-      setPhone("");
-      setAccessRole("pastor");
-      setFeedback({
-        type: "success",
-        text: `Cadastro de "${name.trim()}" criado com sucesso! Usuário: ${finalUsername}`,
-      });
-    } catch (err) {
-      setFeedback({
-        type: "error",
-        text: err instanceof Error ? err.message : "Erro ao criar cadastro.",
-      });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const startEditing = (p: PastorLeader) => {
@@ -300,182 +219,25 @@ export function EquipeAcessosTab({
         </div>
       )}
 
-      {/* Formulário: Criar Novo Pastor / Admin */}
-      <form
-        onSubmit={handleCreatePastor}
-        className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md space-y-6 border-2 border-[#252525]/15"
-      >
-        <div className="flex items-center gap-2.5 pb-3 border-b-2 border-[#DCDACF]">
-          <div className="w-8 h-8 rounded-xl bg-[#CB4B3B] text-[#DCDACF] flex items-center justify-center">
-            <UserPlus className="w-4 h-4" />
+      {/* Aviso informativo: Cadastro centralizado no Portal de Membros */}
+      <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border-2 border-[#252525]/15 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#252525] text-[#DCDACF] flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5 text-[#CB4B3B]" />
           </div>
           <div>
             <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-[#252525]">
-              Novo Cadastro de Pastor / Administrador
+              Gestão Integrada de Pastores
             </h3>
             <p className="text-xs font-semibold text-[#252525]/70">
-              Defina o nome, usuário, senha e nível de acesso no sistema.
+              Novos pastores são nomeados diretamente na plataforma de Membros (membros.igrejadoalto.com).
             </p>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="sm:col-span-2">
-            <label
-              htmlFor="new-pastor-name"
-              className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
-            >
-              Nome do Pastor / Casal / Líder *
-            </label>
-            <input
-              id="new-pastor-name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="Ex: Prs. Marcos e Mara ou Pr. Lucas"
-              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-2.5 text-sm font-semibold text-[#252525]"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="new-pastor-role"
-              className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
-            >
-              Função / Título
-            </label>
-            <input
-              id="new-pastor-role"
-              type="text"
-              value={roleTitle}
-              onChange={(e) => setRoleTitle(e.target.value)}
-              placeholder="Ex: Pastores"
-              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-2.5 text-sm font-semibold text-[#252525]"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="new-pastor-phone"
-              className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
-            >
-              WhatsApp (Opcional)
-            </label>
-            <input
-              id="new-pastor-phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(11) 99999-9999"
-              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-2.5 text-sm font-semibold text-[#252525]"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-          <div>
-            <label
-              htmlFor="new-pastor-user"
-              className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
-            >
-              Usuário para Login *
-            </label>
-            <input
-              id="new-pastor-user"
-              type="text"
-              required
-              value={username}
-              onChange={(e) => {
-                setUsernameTouched(true);
-                setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""));
-              }}
-              placeholder="Ex: marcos"
-              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-2.5 text-sm font-bold text-[#252525]"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="new-pastor-pass"
-              className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
-            >
-              Senha de Acesso *
-            </label>
-            <input
-              id="new-pastor-pass"
-              type="text"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Defina a senha"
-              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-2.5 text-sm font-bold text-[#252525]"
-            />
-          </div>
-
-          <div>
-            <span className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5">
-              Tipo de Acesso no Painel *
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setAccessRole("pastor")}
-                className={`px-3 py-2.5 rounded-xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
-                  accessRole === "pastor"
-                    ? "bg-[#252525] text-[#DCDACF] border-[#252525]"
-                    : "bg-white text-[#252525] border-[#252525]/20 hover:border-[#252525]/40"
-                }`}
-              >
-                🤝 Pastor
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccessRole("admin")}
-                className={`px-3 py-2.5 rounded-xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
-                  accessRole === "admin"
-                    ? "bg-[#CB4B3B] text-[#DCDACF] border-[#CB4B3B]"
-                    : "bg-white text-[#252525] border-[#252525]/20 hover:border-[#252525]/40"
-                }`}
-              >
-                👑 Admin Total
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-[#DCDACF]/55 border border-[#252525]/15 text-xs font-semibold text-[#252525]/85 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            {accessRole === "admin" ? (
-              <span>
-                <strong className="text-[#CB4B3B] uppercase">
-                  👑 Acesso Administrador:
-                </strong>{" "}
-                Visualiza todas as abas (Dashboard, todos os Relatórios, todas
-                as Pessoas, designa Solicitações e gerencia Equipe).
-              </span>
-            ) : (
-              <span>
-                <strong className="text-[#252525] uppercase">
-                  🤝 Acesso Pastor:
-                </strong>{" "}
-                Visualiza apenas a aba de <strong>Registrar Relatório</strong>,
-                as <strong>Solicitações designadas para ele</strong> e as{" "}
-                <strong>Pessoas que ele já visitou</strong>.
-              </span>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] disabled:opacity-50 text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            {isSaving ? "Salvando..." : "Criar Cadastro e Acesso"}
-          </button>
-        </div>
-      </form>
+        <p className="text-xs sm:text-sm text-[#252525]/85 leading-relaxed">
+          Para definir um novo pastor ou cadastrar novos membros na igreja, acesse a aba <strong>Todos os Membros</strong> ou <strong>Gestão de Pastores</strong> no Portal do Membro. Na lista abaixo você pode promover pastores cadastrados a <strong>Admin Total</strong> ou alternar o nível de permissões no painel.
+        </p>
+      </div>
 
       {/* Lista de Pastores e Administradores */}
       <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md space-y-4">

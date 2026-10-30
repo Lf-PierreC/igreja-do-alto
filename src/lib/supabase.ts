@@ -157,6 +157,9 @@ export function mapRowToMember(row: Record<string, any>): Member {
       : Array.isArray(portalData.dependents)
       ? portalData.dependents
       : [],
+    portalRole: row.portal_role || portalData.portalRole || undefined,
+    isPastor: row.is_pastor ?? portalData.isPastor ?? false,
+    isAdmin: row.is_admin ?? portalData.isAdmin ?? false,
   };
 }
 
@@ -170,6 +173,9 @@ export function mapMemberToRow(m: Member) {
     m.familyId ||
     m.familyRole ||
     m.spouseMemberId ||
+    m.portalRole ||
+    m.isPastor ||
+    m.isAdmin ||
     (m.dependents && m.dependents.length > 0);
 
   let finalNotes: string | null = baseNotes || null;
@@ -183,6 +189,9 @@ export function mapMemberToRow(m: Member) {
       familyRole: m.familyRole || null,
       spouseMemberId: m.spouseMemberId || null,
       dependents: m.dependents || [],
+      portalRole: m.portalRole || null,
+      isPastor: m.isPastor ?? false,
+      isAdmin: m.isAdmin ?? false,
     };
     finalNotes = `${baseNotes ? `${baseNotes}\n` : ""}[[MEMBER_PORTAL:${JSON.stringify(
       portalPayload

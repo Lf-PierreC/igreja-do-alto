@@ -79,6 +79,9 @@ export interface MemberSession {
   cpf: string;
   phone: string;
   familyId?: string;
+  portalRole?: "membro" | "pastor" | "admin";
+  isPastor?: boolean;
+  isAdmin?: boolean;
 }
 
 /** Cadastro da pessoa/família (alimentado pela solicitação, portal do membro e pelos relatórios). */
@@ -121,6 +124,11 @@ export interface Member {
   familyRole?: "titular" | "conjuge";
   spouseMemberId?: string; // ID do membro com quem tem vínculo de cônjuge
   dependents?: FamilyDependent[]; // Filhos e dependentes menores de 16 anos
+
+  // Permissões pastorais e administrativas
+  portalRole?: "membro" | "pastor" | "admin";
+  isPastor?: boolean;
+  isAdmin?: boolean;
 }
 
 /** 1. Formulário — Solicitação de Visita Pastoral */
@@ -199,6 +207,7 @@ export interface PastorLeader {
   username?: string;
   password?: string;
   accessRole?: UserAccessRole;
+  memberId?: string;
 }
 
 export interface DatabaseSchema {

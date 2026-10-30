@@ -663,7 +663,7 @@ export function NovaVisitaFormTab({
                   htmlFor="linked-request"
                   className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B] mb-1"
                 >
-                  Selecione a solicitação de visita correspondente4
+                  Selecione a solicitação de visita correspondente
                 </label>
                 <select
                   id="linked-request"

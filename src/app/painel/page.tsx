@@ -472,12 +472,13 @@ export default function PainelLideresPage() {
 
             <Link
               href="/membros"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-emerald-700 text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
-              title="Abrir Portal do Membro & Família"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold uppercase tracking-wider transition-colors"
+              title="Acessar Portal do Membro (membros.igrejadoalto.com)"
             >
-              <Users className="w-4 h-4 text-emerald-400" />
+              <Users className="w-4 h-4 text-[#CB4B3B]" />
               <span className="hidden sm:inline">Portal do Membro</span>
             </Link>
+
 
             <button
               type="button"

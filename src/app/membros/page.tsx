@@ -11,8 +11,10 @@ import {
   MaritalStatus,
   Member,
   MemberSession,
+  PastorLeader,
   RequestReason,
   Shift,
+  VisitReport,
   VisitRequest,
   WeekDay,
 } from "@/types/visitas";
@@ -34,7 +36,12 @@ import {
   formatCEP,
   fetchAddressByCEP,
 } from "@/lib/cpfUtils";
-import { formatAddress, formatDateBR, STATUS_META } from "@/lib/visitasUtils";
+import {
+  formatAddress,
+  formatDateBR,
+  SITUATION_META,
+  STATUS_META,
+} from "@/lib/visitasUtils";
 import { LightDismissDialog } from "@/components/LightDismissDialog";
 import {
   Users,
@@ -45,6 +52,7 @@ import {
   Phone,
   Mail,
   Lock,
+  KeyRound,
   Calendar,
   Clock,
   Sparkles,
@@ -63,11 +71,25 @@ import {
   Search,
   UserX,
   Church,
+  ExternalLink,
+  Crown,
+  Copy,
+  UserPlus,
+  Filter,
+  Check,
+  X,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
 
-type ActiveTab = "familia" | "solicitar-visita" | "minhas-solicitacoes" | "meu-cadastro";
+type ActiveTab =
+  | "todos-membros"
+  | "gestao-pastores"
+  | "visitas-cuidado"
+  | "familia"
+  | "solicitar-visita"
+  | "minhas-solicitacoes"
+  | "meu-cadastro";
 
 export default function PortalDoMembroPage() {
   const [session, setSession] = useState<MemberSession | null>(null);
@@ -182,6 +204,53 @@ export default function PortalDoMembroPage() {
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // Estados de Gestão de Membros, Pastores e Visitas (Admin & Pastor)
+  const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [pastorsList, setPastorsList] = useState<PastorLeader[]>([]);
+  const [allReports, setAllReports] = useState<VisitReport[]>([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [memberFilterCategory, setMemberFilterCategory] = useState<
+    "todos" | "membros" | "pastores" | "admins" | "visitantes"
+  >("todos");
+  const [visitedSearchQuery, setVisitedSearchQuery] = useState("");
+  const [visitedPastorFilter, setVisitedPastorFilter] = useState("todos");
+  const [adminFeedback, setAdminFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  // Modal: Cadastrar Novo Membro (Admin ou Pastor)
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [addMemName, setAddMemName] = useState("");
+  const [addMemCpf, setAddMemCpf] = useState("");
+  const [addMemEmail, setAddMemEmail] = useState("");
+  const [addMemPhone, setAddMemPhone] = useState("");
+  const [addMemBirthDate, setAddMemBirthDate] = useState("");
+  const [addMemMaritalStatus, setAddMemMaritalStatus] = useState<MaritalStatus>("Casado(a)");
+  const [addMemSpouseName, setAddMemSpouseName] = useState("");
+  const [addMemCep, setAddMemCep] = useState("");
+  const [addMemStreet, setAddMemStreet] = useState("");
+  const [addMemNumber, setAddMemNumber] = useState("");
+  const [addMemComplement, setAddMemComplement] = useState("");
+  const [addMemNeighborhood, setAddMemNeighborhood] = useState("");
+  const [addMemCity, setAddMemCity] = useState("Mogi das Cruzes");
+  const [isSearchingCepAddMem, setIsSearchingCepAddMem] = useState(false);
+  const [cepErrorAddMem, setCepErrorAddMem] = useState<string | null>(null);
+  const [addMemRelationship, setAddMemRelationship] = useState<ChurchRelationship>("Membro");
+  const [addMemAttendanceTime, setAddMemAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
+  const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não">("Não");
+  const [addMemActivityName, setAddMemActivityName] = useState("");
+  const [addMemPassword, setAddMemPassword] = useState("igrejadoalto");
+  const [addMemIsPastor, setAddMemIsPastor] = useState(false);
+  const [addMemIsAdmin, setAddMemIsAdmin] = useState(false);
+  const [isSavingAddMember, setIsSavingAddMember] = useState(false);
+  const [addMemberError, setAddMemberError] = useState<string | null>(null);
+
+  // Nomeação Rápida de Pastor (Aba Gestão de Pastores)
+  const [selectedMemberToAppoint, setSelectedMemberToAppoint] = useState("");
+  const [appointAsAdmin, setAppointAsAdmin] = useState(false);
+  const [isAppointing, setIsAppointing] = useState(false);
+
   // Carrega sessão salva no localStorage
   useEffect(() => {
     try {
@@ -191,6 +260,9 @@ export default function PortalDoMembroPage() {
         if (parsed && parsed.id) {
           setSession(parsed);
           loadMemberDashboard(parsed.id);
+          if (parsed.isAdmin || parsed.isPastor) {
+            setActiveTab("todos-membros");
+          }
         }
       }
     } catch {
@@ -209,6 +281,9 @@ export default function PortalDoMembroPage() {
         setSpouseData(data.spouse || null);
         setDependents(data.dependents || []);
         setMyRequests(data.requests || []);
+        if (data.allMembers) setAllMembers(data.allMembers);
+        if (data.pastors) setPastorsList(data.pastors);
+        if (data.reports) setAllReports(data.reports);
       }
     } catch (err) {
       console.error("Erro ao carregar dados do membro:", err);
@@ -240,6 +315,14 @@ export default function PortalDoMembroPage() {
 
       setSession(data.session);
       setMemberData(data.member);
+      if (data.allMembers) setAllMembers(data.allMembers);
+      if (data.pastors) setPastorsList(data.pastors);
+      if (data.reports) setAllReports(data.reports);
+
+      if (data.session.isAdmin || data.session.isPastor) {
+        setActiveTab("todos-membros");
+      }
+
       try {
         window.localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(data.session));
       } catch {
@@ -721,6 +804,239 @@ export default function PortalDoMembroPage() {
     }
   };
 
+  const handleLookupCepAddMem = async () => {
+    const clean = cleanDigits(addMemCep);
+    if (clean.length !== 8) {
+      setCepErrorAddMem("Digite os 8 números do CEP.");
+      return;
+    }
+    setCepErrorAddMem(null);
+    setIsSearchingCepAddMem(true);
+    try {
+      const result = await fetchAddressByCEP(clean);
+      if (!result) {
+        setCepErrorAddMem("CEP não encontrado.");
+        return;
+      }
+      if (result.street) setAddMemStreet(result.street);
+      if (result.neighborhood) setAddMemNeighborhood(result.neighborhood);
+      if (result.city) setAddMemCity(result.city);
+    } catch {
+      setCepErrorAddMem("Erro ao consultar CEP.");
+    } finally {
+      setIsSearchingCepAddMem(false);
+    }
+  };
+
+  const handleAdminCreateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddMemberError(null);
+    if (!addMemName.trim()) {
+      setAddMemberError("Informe o nome completo do membro.");
+      return;
+    }
+    if (addMemCpf && !validateCPF(cleanDigits(addMemCpf))) {
+      setAddMemberError("CPF inválido. Confira os números digitados.");
+      return;
+    }
+    setIsSavingAddMember(true);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ADMIN_CREATE_MEMBER",
+          payload: {
+            name: addMemName.trim(),
+            cpf: addMemCpf ? cleanDigits(addMemCpf) : undefined,
+            email: addMemEmail.trim() || undefined,
+            phone: addMemPhone.trim(),
+            birthDate: addMemBirthDate || undefined,
+            maritalStatus: addMemMaritalStatus,
+            spouseName:
+              addMemMaritalStatus === "Casado(a)"
+                ? addMemSpouseName.trim()
+                : undefined,
+            relationship: addMemRelationship,
+            attendanceTime: addMemAttendanceTime || undefined,
+            participatesInActivity: addMemParticipates === "Sim",
+            activityName:
+              addMemParticipates === "Sim"
+                ? addMemActivityName.trim()
+                : undefined,
+            address: {
+              cep: addMemCep ? cleanDigits(addMemCep) : undefined,
+              street: addMemStreet.trim(),
+              number: addMemNumber.trim(),
+              complement: addMemComplement.trim(),
+              neighborhood: addMemNeighborhood.trim(),
+              city: addMemCity.trim() || "Mogi das Cruzes",
+            },
+            password: addMemPassword.trim() || "igrejadoalto",
+            isPastor: Boolean(addMemIsPastor),
+            isAdmin: Boolean(addMemIsAdmin),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao cadastrar membro.");
+      }
+      if (data.allMembers) setAllMembers(data.allMembers);
+      if (data.pastors) setPastorsList(data.pastors);
+      setIsAddMemberModalOpen(false);
+      setAdminFeedback({
+        type: "success",
+        text: `Membro "${addMemName.trim()}" cadastrado com sucesso!`,
+      });
+      // Reset form
+      setAddMemName("");
+      setAddMemCpf("");
+      setAddMemEmail("");
+      setAddMemPhone("");
+      setAddMemBirthDate("");
+      setAddMemSpouseName("");
+      setAddMemCep("");
+      setAddMemStreet("");
+      setAddMemNumber("");
+      setAddMemComplement("");
+      setAddMemNeighborhood("");
+      setAddMemIsPastor(false);
+      setAddMemIsAdmin(false);
+    } catch (err) {
+      setAddMemberError(
+        err instanceof Error ? err.message : "Erro ao cadastrar membro."
+      );
+    } finally {
+      setIsSavingAddMember(false);
+    }
+  };
+
+  const handleSetMemberPastor = async (
+    targetMember: Member,
+    willBePastor: boolean,
+    willBeAdmin?: boolean
+  ) => {
+    if (!session) return;
+    const confirmMsg = willBePastor
+      ? `Deseja nomear "${targetMember.name}" como Pastor da Igreja?`
+      : `Deseja remover a função pastoral de "${targetMember.name}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ADMIN_SET_MEMBER_PASTOR",
+          payload: {
+            memberId: targetMember.id,
+            isPastor: willBePastor,
+            isAdmin: Boolean(willBeAdmin),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao atualizar permissão pastoral.");
+      }
+      if (data.allMembers) setAllMembers(data.allMembers);
+      if (data.pastors) setPastorsList(data.pastors);
+      setAdminFeedback({
+        type: "success",
+        text: willBePastor
+          ? `"${targetMember.name}" agora é Pastor da Igreja!`
+          : `Função pastoral removida de "${targetMember.name}".`,
+      });
+    } catch (err) {
+      setAdminFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao alterar permissão.",
+      });
+    }
+  };
+
+  const handleTogglePastorAccess = async (pastor: PastorLeader) => {
+    const nextRole = pastor.accessRole === "admin" ? "pastor" : "admin";
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ADMIN_TOGGLE_PASTOR_ACCESS",
+          payload: {
+            pastorId: pastor.id,
+            accessRole: nextRole,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao alternar nível de acesso.");
+      }
+      if (data.pastors) setPastorsList(data.pastors);
+      if (data.allMembers) setAllMembers(data.allMembers);
+      setAdminFeedback({
+        type: "success",
+        text: `Acesso de "${pastor.name}" alterado para ${
+          nextRole === "admin" ? "Admin Total" : "Pastor"
+        }.`,
+      });
+    } catch (err) {
+      setAdminFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao alterar acesso.",
+      });
+    }
+  };
+
+  const handleDemotePastor = async (pastor: PastorLeader) => {
+    if (!window.confirm(`Deseja remover a função pastoral de "${pastor.name}"?`))
+      return;
+    const targetMember = allMembers.find(
+      (m) =>
+        m.id === pastor.memberId ||
+        m.name.toLowerCase() === pastor.name.toLowerCase()
+    );
+    if (!targetMember) {
+      alert("Membro correspondente não localizado.");
+      return;
+    }
+    await handleSetMemberPastor(targetMember, false, false);
+  };
+
+  const handleQuickAppointPastor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMemberToAppoint) return;
+    const target = allMembers.find((m) => m.id === selectedMemberToAppoint);
+    if (!target) return;
+    setIsAppointing(true);
+    try {
+      await handleSetMemberPastor(target, true, appointAsAdmin);
+      setSelectedMemberToAppoint("");
+      setAppointAsAdmin(false);
+    } finally {
+      setIsAppointing(false);
+    }
+  };
+
+  const handleOpenVisitsPortal = () => {
+    if (!session) return;
+    try {
+      const userSession = {
+        name: session.name,
+        role: session.isAdmin ? "admin" : "pastor",
+        accessRole: session.isAdmin ? "admin" : "pastor",
+        isMasterAdmin: Boolean(session.isAdmin),
+      };
+      window.localStorage.setItem(
+        "igreja_alto_user_session_v2",
+        JSON.stringify(userSession)
+      );
+    } catch {}
+    window.open("/painel?tab=pessoas", "_blank");
+  };
+
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-[#DCDACF] flex items-center justify-center p-4">
@@ -744,12 +1060,7 @@ export default function PortalDoMembroPage() {
                 <Users className="w-3.5 h-3.5 text-[#CB4B3B]" />
                 Portal do Membro
               </span>
-              <Link
-                href="/"
-                className="text-xs font-bold text-[#DCDACF]/75 hover:text-white transition-colors ml-2"
-              >
-                Acesso Pastoral →
-              </Link>
+              
             </div>
           </div>
         </header>
@@ -863,15 +1174,7 @@ export default function PortalDoMembroPage() {
                     )}
                   </button>
 
-                  <div className="pt-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode("register")}
-                      className="text-xs font-extrabold text-[#CB4B3B] hover:underline"
-                    >
-                      Não possui cadastro? Cadastre-se com seu CPF aqui
-                    </button>
-                  </div>
+                  
                 </form>
               ) : (
                 /* TELA DE CADASTRO OFICIAL DO MEMBRO */
@@ -1353,6 +1656,62 @@ export default function PortalDoMembroPage() {
     );
   }
 
+  const filteredMembers = allMembers.filter((m) => {
+    const q = memberSearchQuery.toLowerCase().trim();
+    const cleanQ = cleanDigits(q);
+    const matchesQuery =
+      !q ||
+      m.name.toLowerCase().includes(q) ||
+      (m.cpf && cleanDigits(m.cpf).includes(cleanQ)) ||
+      (m.phone && m.phone.includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q));
+
+    if (!matchesQuery) return false;
+
+    if (memberFilterCategory === "membros") {
+      return m.relationship === "Membro" || m.isOfficialMember;
+    }
+    if (memberFilterCategory === "pastores") {
+      return Boolean(
+        m.isPastor || m.portalRole === "pastor" || m.portalRole === "admin"
+      );
+    }
+    if (memberFilterCategory === "admins") {
+      return Boolean(m.isAdmin || m.portalRole === "admin");
+    }
+    if (memberFilterCategory === "visitantes") {
+      return m.relationship !== "Membro";
+    }
+    return true;
+  });
+
+  const filteredReports = allReports.filter((r) => {
+    if (!session?.isAdmin && session?.name) {
+      const pName = session.name.toLowerCase();
+      const hasPastor = (r.visitors || []).some(
+        (v) => v.toLowerCase().includes(pName) || pName.includes(v.toLowerCase())
+      );
+      if (!hasPastor) {
+        return false;
+      }
+    }
+
+    if (session?.isAdmin && visitedPastorFilter !== "todos") {
+      const matchesPastor = (r.visitors || []).some(
+        (v) => v === visitedPastorFilter
+      );
+      if (!matchesPastor) return false;
+    }
+
+    const q = visitedSearchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (r.memberName && r.memberName.toLowerCase().includes(q)) ||
+      (r.summary && r.summary.toLowerCase().includes(q)) ||
+      (r.visitors && r.visitors.some((v) => v.toLowerCase().includes(q)))
+    );
+  });
+
   // =========================================================================
   // TELA LOGADO: PORTAL DO MEMBRO & NÚCLEO FAMILIAR
   // =========================================================================
@@ -1371,11 +1730,22 @@ export default function PortalDoMembroPage() {
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="block text-xs font-black uppercase text-white">
-                {session.name}
-              </span>
+              <div className="flex items-center justify-end gap-2">
+                <span className="block text-xs font-black uppercase text-white">
+                  {session.name}
+                </span>
+                {session.isAdmin ? (
+                  <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                    👑 Admin
+                  </span>
+                ) : session.isPastor ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider">
+                    🤝 Pastor
+                  </span>
+                ) : null}
+              </div>
               <span className="block text-[11px] font-bold text-[#DCDACF]/70">
-                CPF: {formatCPF(session.cpf)}
+                {session.cpf ? `CPF: ${formatCPF(session.cpf)}` : session.email || ""}
               </span>
             </div>
 
@@ -1392,51 +1762,107 @@ export default function PortalDoMembroPage() {
 
         {/* Barra de Navegação das Abas do Membro */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {[
-            {
-              id: "familia" as ActiveTab,
+          {(() => {
+            const tabs: {
+              id: ActiveTab;
+              label: string;
+              icon: any;
+            }[] = [];
+
+            if (session.isAdmin || session.isPastor) {
+              tabs.push({
+                id: "todos-membros",
+                label: `Todos os Membros (${allMembers.length})`,
+                icon: Users,
+              });
+              tabs.push({
+                id: "visitas-cuidado",
+                label: "Visitas por Pessoas",
+                icon: ClipboardCheck,
+              });
+            }
+
+            if (session.isAdmin) {
+              tabs.push({
+                id: "gestao-pastores",
+                label: `Gestão de Pastores (${pastorsList.length})`,
+                icon: Crown,
+              });
+            }
+
+            tabs.push({
+              id: "familia",
               label: `Minha Família (${dependents.length + (spouseData ? 2 : 1)})`,
-              icon: Users,
-            },
-            {
-              id: "solicitar-visita" as ActiveTab,
-              label: "Solicitar Visita Pastoral",
+              icon: Home,
+            });
+            tabs.push({
+              id: "solicitar-visita",
+              label: "Solicitar Visita",
               icon: HeartHandshake,
-            },
-            {
-              id: "minhas-solicitacoes" as ActiveTab,
+            });
+            tabs.push({
+              id: "minhas-solicitacoes",
               label: `Minhas Solicitações (${myRequests.length})`,
-              icon: ClipboardCheck,
-            },
-            {
-              id: "meu-cadastro" as ActiveTab,
+              icon: Heart,
+            });
+            tabs.push({
+              id: "meu-cadastro",
               label: "Meu Cadastro",
               icon: User,
-            },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${
-                  isActive
-                    ? "bg-[#CB4B3B] text-[#DCDACF] shadow"
-                    : "text-[#DCDACF]/80 hover:bg-[#363636] hover:text-white"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+            });
+
+            return tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${
+                    isActive
+                      ? "bg-[#CB4B3B] text-[#DCDACF] shadow"
+                      : "text-[#DCDACF]/80 hover:bg-[#363636] hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            });
+          })()}
         </div>
       </header>
 
       {/* Conteúdo Principal */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {adminFeedback && (
+          <div
+            className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${
+              adminFeedback.type === "success"
+                ? "bg-emerald-950 text-[#DCDACF] border-emerald-600"
+                : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              {adminFeedback.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-[#CB4B3B] shrink-0" />
+              )}
+              <span>{adminFeedback.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminFeedback(null)}
+              className="text-current opacity-70 hover:opacity-100 p-1"
+              title="Fechar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* ===================================================================
             ABA 1: MINHA FAMÍLIA (Cônjuge + Filhos < 16 anos)
            =================================================================== */}
@@ -2649,7 +3075,893 @@ export default function PortalDoMembroPage() {
           </div>
         )}
 
+        {/* ===================================================================
+            ABA 5: TODOS OS MEMBROS (Admin & Pastor)
+           =================================================================== */}
+        {activeTab === "todos-membros" && (session?.isPastor || session?.isAdmin) && (
+          <div className="space-y-6">
+            {/* Cabeçalho da Aba */}
+            <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B] flex items-center gap-1.5">
+                  <Users className="w-4 h-4" />
+                  Diretório Geral da Igreja
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#252525] mt-1">
+                  Todos os Membros ({allMembers.length})
+                </h2>
+                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1">
+                  Consulte os cadastros, localize famílias e gerencie a nomeação de pastores na plataforma.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddMemberModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Cadastrar Novo Membro</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Linha de Indicadores Rápidos */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-[#252525]/60">
+                  Total de Cadastros
+                </span>
+                <span className="text-2xl font-black text-[#252525]">{allMembers.length}</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-[#252525]/60">
+                  Membros Oficiais
+                </span>
+                <span className="text-2xl font-black text-emerald-700">
+                  {
+                    allMembers.filter(
+                      (m) => m.relationship === "Membro" || m.isOfficialMember
+                    ).length
+                  }
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-[#252525]/60">
+                  Pastores & Líderes
+                </span>
+                <span className="text-2xl font-black text-[#CB4B3B]">
+                  {allMembers.filter((m) => m.isPastor).length}
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-[#252525]/60">
+                  Administradores
+                </span>
+                <span className="text-2xl font-black text-[#252525]">
+                  {allMembers.filter((m) => m.isAdmin).length}
+                </span>
+              </div>
+            </div>
+
+            {/* Barra de Filtros e Busca */}
+            <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  placeholder="Pesquisar por nome, CPF, telefone ou e-mail..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold text-[#252525] placeholder-[#252525]/40"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: "todos", label: "Todos" },
+                  { id: "membros", label: "Membros" },
+                  { id: "pastores", label: "Pastores" },
+                  { id: "admins", label: "Admins" },
+                  { id: "visitantes", label: "Visitantes" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setMemberFilterCategory(f.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      memberFilterCategory === f.id
+                        ? "bg-[#252525] text-white"
+                        : "bg-white text-[#252525]/75 hover:bg-[#DCDACF]"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lista dos Membros (Cards) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredMembers.map((m) => {
+                const isPastor = Boolean(
+                  m.isPastor ||
+                    m.portalRole === "pastor" ||
+                    m.portalRole === "admin"
+                );
+                const isAdmin = Boolean(m.isAdmin || m.portalRole === "admin");
+
+                return (
+                  <div
+                    key={m.id}
+                    className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm hover:shadow-md transition-shadow space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-[#DCDACF] text-[#252525] flex items-center justify-center font-black text-lg shrink-0">
+                          {m.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-black text-[#252525] leading-tight">
+                              {m.name}
+                            </h3>
+                            {isAdmin && (
+                              <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                                👑 Admin Total
+                              </span>
+                            )}
+                            {isPastor && !isAdmin && (
+                              <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider">
+                                🤝 Pastor
+                              </span>
+                            )}
+                          </div>
+                          <span className="inline-block mt-0.5 text-xs font-bold text-[#252525]/60">
+                            {m.relationship || "Membro"} • {m.maritalStatus || "Solteiro(a)"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-xl bg-[#F4F3EE] text-[11px] font-extrabold text-[#252525]/80">
+                        {m.attendanceTime || "Membro"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-[#252525]/80 pt-2 border-t border-[#252525]/10">
+                      {m.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-[#CB4B3B] shrink-0" />
+                          <span>{formatPhoneBR(m.phone)}</span>
+                        </div>
+                      )}
+                      {m.cpf && (
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
+                          <span>CPF: {formatCPF(m.cpf)}</span>
+                        </div>
+                      )}
+                      {m.email && (
+                        <div className="flex items-center gap-1.5 sm:col-span-2 truncate">
+                          <Mail className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
+                          <span className="truncate">{m.email}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 sm:col-span-2 text-[#252525]/70">
+                        <MapPin className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
+                        <span className="truncate">{formatAddress(m.address)}</span>
+                      </div>
+                    </div>
+
+                    {/* Informações da Família */}
+                    {(m.spouseName || (m.dependents && m.dependents.length > 0)) && (
+                      <div className="p-2.5 rounded-xl bg-[#F4F3EE] text-xs font-semibold text-[#252525]/80 space-y-1">
+                        {m.spouseName && (
+                          <div className="flex items-center gap-1.5">
+                            <Heart className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                            <span>
+                              Cônjuge: <strong>{m.spouseName}</strong>
+                            </span>
+                          </div>
+                        )}
+                        {m.dependents && m.dependents.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Baby className="w-3.5 h-3.5 text-[#252525]/60" />
+                            <span>
+                              Filhos / Dependentes:{" "}
+                              <strong>
+                                {m.dependents
+                                  .map((d) => d.fullName || (d as any).name)
+                                  .join(", ")}
+                              </strong>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Ações Administrativas (Exclusivo para Administrador) */}
+                    {session?.isAdmin && (
+                      <div className="pt-2 border-t border-[#252525]/10 flex flex-wrap items-center justify-between gap-2">
+                        {!isPastor ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSetMemberPastor(m, true, false)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-white text-xs font-black uppercase tracking-wider transition-colors"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Definir como Pastor</span>
+                          </button>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSetMemberPastor(m, true, !isAdmin)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                                isAdmin
+                                  ? "bg-white text-[#252525] border border-[#252525]/30 hover:bg-[#DCDACF]"
+                                  : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
+                              }`}
+                            >
+                              {isAdmin ? "Rebaixar p/ Pastor" : "👑 Tornar Admin Total"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetMemberPastor(m, false, false)}
+                              className="px-2.5 py-1.5 rounded-xl bg-[#F9EAE8] hover:bg-[#CB4B3B] text-[#CB4B3B] hover:text-white text-xs font-bold transition-colors"
+                              title="Remover função pastoral"
+                            >
+                              Remover Pastor
+                            </button>
+                          </div>
+                        )}
+
+                        <span className="text-[11px] font-bold text-[#252525]/50 ml-auto">
+                          ID: {m.id}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+            ABA 6: GESTÃO DE PASTORES (Exclusivo para Admin)
+           =================================================================== */}
+        {activeTab === "gestao-pastores" && session?.isAdmin && (
+          <div className="space-y-6">
+            {/* Cabeçalho */}
+            <div className="rounded-3xl bg-[#252525] text-[#DCDACF] p-6 sm:p-8 border-b-4 border-[#CB4B3B] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
+                  <Crown className="w-4 h-4" />
+                  Corpo Pastoral & Acessos Administrativos
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
+                  Gestão de Equipe Pastoral ({pastorsList.length})
+                </h2>
+                <p className="text-xs sm:text-sm text-[#DCDACF]/80 leading-relaxed">
+                  Defina quais membros atuam como pastores e conceda privilégios de{" "}
+                  <strong>Admin Total</strong> para os líderes responsáveis pela igreja.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenVisitsPortal}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow shrink-0"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Abrir Portal de Visitas</span>
+              </button>
+            </div>
+
+            {/* Card: Nomear Novo Pastor a partir de Membro Existente */}
+            <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#252525]/15">
+                <ShieldCheck className="w-5 h-5 text-[#CB4B3B]" />
+                <h3 className="text-base font-black uppercase text-[#252525]">
+                  Nomear Membro como Pastor
+                </h3>
+              </div>
+
+              <form onSubmit={handleQuickAppointPastor} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-[#252525] mb-1">
+                      Selecione o Membro Cadastrado *
+                    </label>
+                    <select
+                      value={selectedMemberToAppoint}
+                      onChange={(e) => setSelectedMemberToAppoint(e.target.value)}
+                      className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-bold text-[#252525]"
+                    >
+                      <option value="">-- Escolha um membro para nomear --</option>
+                      {allMembers
+                        .filter((m) => !m.isPastor && m.id !== "admin-master")
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({formatPhoneBR(m.phone) || m.email || "Sem contato"})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl border-2 border-[#252525]/20 bg-white cursor-pointer hover:border-[#CB4B3B]">
+                      <input
+                        type="checkbox"
+                        checked={appointAsAdmin}
+                        onChange={(e) => setAppointAsAdmin(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
+                      />
+                      <span className="text-xs font-black uppercase text-[#252525]">
+                        👑 Acesso Admin Total
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end">
+                  <button
+                    type="submit"
+                    disabled={!selectedMemberToAppoint || isAppointing}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider shadow"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>
+                      {isAppointing ? "Nomeando..." : "Confirmar Nomeação como Pastor"}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Lista dos Pastores Atuais */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#252525]/70">
+                Pastores e Administradores em Atividade ({pastorsList.length})
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pastorsList.map((p) => {
+                  const isAdmin = p.accessRole === "admin";
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-black text-[#252525]">{p.name}</h4>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                isAdmin
+                                  ? "bg-[#CB4B3B] text-white"
+                                  : "bg-[#252525] text-[#DCDACF]"
+                              }`}
+                            >
+                              {isAdmin ? "👑 Admin Total" : "🤝 Pastor"}
+                            </span>
+                          </div>
+                          <span className="text-xs font-bold text-[#252525]/60">
+                            {p.role || "Pastores"} • {p.phone || "Sem telefone"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#252525]/80 bg-[#F4F3EE] p-2.5 rounded-xl">
+                        <span className="inline-flex items-center gap-1">
+                          <KeyRound className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                          Login de acesso: <strong>{p.username || "pastor"}</strong>
+                        </span>
+                      </div>
+
+                      <div className="pt-2 border-t border-[#252525]/10 flex flex-wrap items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePastorAccess(p)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                            isAdmin
+                              ? "bg-white text-[#252525] border border-[#252525]/25 hover:bg-[#DCDACF]"
+                              : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
+                          }`}
+                        >
+                          {isAdmin ? "Mudar p/ Pastor" : "👑 Tornar Admin Total"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDemotePastor(p)}
+                          className="px-3 py-1.5 rounded-xl bg-[#F9EAE8] hover:bg-[#CB4B3B] text-[#CB4B3B] hover:text-white text-xs font-bold uppercase transition-colors"
+                        >
+                          Remover Pastor
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+            ABA 7: VISITAS & CUIDADO (Pastor & Admin)
+           =================================================================== */}
+        {activeTab === "visitas-cuidado" && (session?.isPastor || session?.isAdmin) && (
+          <div className="space-y-6">
+            {/* Banner Superior com Link para o Portal de Visitas */}
+            <div className="rounded-3xl bg-[#252525] text-[#DCDACF] p-6 sm:p-8 border-b-4 border-[#CB4B3B] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
+                  <HeartHandshake className="w-4 h-4" />
+                  Acompanhamento Pastoral Integrado
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
+                  Visitas por Pessoas & Cuidado Familiar
+                </h2>
+                <p className="text-xs sm:text-sm text-[#DCDACF]/80 leading-relaxed">
+                  Acompanhe os diagnósticos, motivos de oração e histórico das pessoas visitadas.
+                  Para relatórios detalhados e designação de visitas, acesse o painel completo.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenVisitsPortal}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow shrink-0"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Abrir Portal de Visitas Completo</span>
+              </button>
+            </div>
+
+            {/* Barra de Filtros */}
+            <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={visitedSearchQuery}
+                  onChange={(e) => setVisitedSearchQuery(e.target.value)}
+                  placeholder="Pesquisar por nome da pessoa visitada ou observações..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold text-[#252525]"
+                />
+              </div>
+
+              {session?.isAdmin && pastorsList.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#252525]/70 whitespace-nowrap">
+                    Pastor:
+                  </span>
+                  <select
+                    value={visitedPastorFilter}
+                    onChange={(e) => setVisitedPastorFilter(e.target.value)}
+                    className="rounded-xl border-2 border-[#252525]/20 bg-white px-3 py-2 text-xs font-bold text-[#252525]"
+                  >
+                    <option value="todos">Todos os Pastores</option>
+                    {pastorsList.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Lista dos Relatórios de Visita por Pessoa */}
+            <div className="space-y-4">
+              {filteredReports.length === 0 ? (
+                <div className="p-8 rounded-3xl bg-white border border-[#252525]/10 text-center space-y-3">
+                  <HeartHandshake className="w-10 h-10 text-[#CB4B3B] mx-auto opacity-40" />
+                  <h4 className="text-base font-black text-[#252525]">
+                    Nenhum registro de visita localizado
+                  </h4>
+                  <p className="text-xs text-[#252525]/60 max-w-md mx-auto">
+                    Não foram encontrados relatórios para o filtro informado. Acesse o portal de
+                    visitas para registrar novos relatórios pastorais.
+                  </p>
+                </div>
+              ) : (
+                filteredReports.map((r) => {
+                  const meta = r.situation
+                    ? SITUATION_META[r.situation]
+                    : SITUATION_META.bem;
+
+                  return (
+                    <div
+                      key={r.id}
+                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#252525]/10">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-base font-black text-[#252525]">
+                            {r.memberName}
+                          </h4>
+                          <span
+                            className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                            style={{ backgroundColor: meta.color }}
+                          >
+                            {meta.emoji} {meta.shortLabel}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#252525]/70">
+                          <Calendar className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                          <span>
+                            Visita em: <strong>{formatDateBR(r.visitDate)}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-[#252525]/80">
+                        <div>
+                          <span className="text-[#252525]/60 block text-[11px] font-bold uppercase">
+                            Pastor(es) Responsável(is):
+                          </span>
+                          <strong>
+                            {(r.visitors || []).join(", ") || "Equipe Pastoral"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[#252525]/60 block text-[11px] font-bold uppercase">
+                            Motivo Principal:
+                          </span>
+                          <span>{r.mainReason || "Comunhão pastoral"}</span>
+                        </div>
+                      </div>
+
+                      {r.summary && (
+                        <div className="p-3 rounded-2xl bg-[#F4F3EE] text-xs font-medium text-[#252525]/85">
+                          <span className="block text-[11px] font-black uppercase text-[#CB4B3B] mb-0.5">
+                            Diagnóstico Pastoral & Observações:
+                          </span>
+                          <p className="whitespace-pre-line leading-relaxed">
+                            {r.summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {r.followUpNeeds && r.followUpNeeds.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[11px] font-black uppercase text-[#252525]/60 mr-1">
+                            Acompanhamento:
+                          </span>
+                          {r.followUpNeeds.map((need, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-lg bg-[#DCDACF] text-[#252525] text-[10px] font-bold"
+                            >
+                              {need}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {/* MODAL: CADASTRAR NOVO MEMBRO (ADMIN OU PASTOR) */}
+      <LightDismissDialog
+        open={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        title="Cadastrar Novo Membro na Plataforma"
+        subtitle="Registro oficial de membro com relacionamento eclesiástico e dados cadastrais"
+        maxWidthClass="max-w-2xl"
+      >
+        <form
+          onSubmit={handleAdminCreateMember}
+          className="space-y-4 text-xs font-semibold text-[#252525]"
+        >
+          {addMemberError && (
+            <div className="p-3 rounded-xl bg-[#F9EAE8] text-[#A93829] border border-[#CB4B3B] font-bold">
+              {addMemberError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Nome Completo *
+              </label>
+              <input
+                type="text"
+                required
+                value={addMemName}
+                onChange={(e) => setAddMemName(e.target.value)}
+                placeholder="Ex: João Silva de Almeida"
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                CPF (Opcional / Recomendado)
+              </label>
+              <input
+                type="text"
+                value={addMemCpf}
+                onChange={(e) => setAddMemCpf(formatCPF(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Data de Nascimento
+              </label>
+              <input
+                type="date"
+                value={addMemBirthDate}
+                onChange={(e) => setAddMemBirthDate(e.target.value)}
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Telefone / WhatsApp *
+              </label>
+              <input
+                type="tel"
+                required
+                value={addMemPhone}
+                onChange={(e) => setAddMemPhone(formatPhoneBR(e.target.value))}
+                placeholder="(11) 99999-9999"
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                E-mail (para login)
+              </label>
+              <input
+                type="email"
+                value={addMemEmail}
+                onChange={(e) => setAddMemEmail(e.target.value)}
+                placeholder="membro@exemplo.com"
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Estado Civil
+              </label>
+              <select
+                value={addMemMaritalStatus}
+                onChange={(e) => setAddMemMaritalStatus(e.target.value as MaritalStatus)}
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-bold"
+              >
+                {MARITAL_STATUS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {addMemMaritalStatus === "Casado(a)" && (
+              <div>
+                <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                  Nome do Cônjuge
+                </label>
+                <input
+                  type="text"
+                  value={addMemSpouseName}
+                  onChange={(e) => setAddMemSpouseName(e.target.value)}
+                  placeholder="Nome do esposo(a)"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-semibold"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Endereço com Busca de CEP */}
+          <div className="p-3 rounded-2xl bg-[#F4F3EE] border border-[#252525]/15 space-y-3">
+            <span className="block text-[11px] font-black uppercase text-[#CB4B3B]">
+              Endereço Residencial
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  CEP (Opcional)
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={addMemCep}
+                    onChange={(e) => setAddMemCep(formatCEP(e.target.value))}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookupCepAddMem}
+                    disabled={isSearchingCepAddMem}
+                    className="px-2.5 py-1.5 rounded-xl bg-[#252525] text-white text-xs font-bold shrink-0"
+                    title="Buscar CEP"
+                  >
+                    {isSearchingCepAddMem ? "..." : <Search className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {cepErrorAddMem && (
+                  <span className="text-[10px] text-[#CB4B3B] block mt-0.5">
+                    {cepErrorAddMem}
+                  </span>
+                )}
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  Rua / Avenida
+                </label>
+                <input
+                  type="text"
+                  value={addMemStreet}
+                  onChange={(e) => setAddMemStreet(e.target.value)}
+                  placeholder="Nome da rua"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  Número
+                </label>
+                <input
+                  type="text"
+                  value={addMemNumber}
+                  onChange={(e) => setAddMemNumber(e.target.value)}
+                  placeholder="Nº"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  Bairro
+                </label>
+                <input
+                  type="text"
+                  value={addMemNeighborhood}
+                  onChange={(e) => setAddMemNeighborhood(e.target.value)}
+                  placeholder="Bairro"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  Cidade
+                </label>
+                <input
+                  type="text"
+                  value={addMemCity}
+                  onChange={(e) => setAddMemCity(e.target.value)}
+                  placeholder="Cidade"
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Relacionamento com a Igreja */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Relacionamento Eclesiástico
+              </label>
+              <select
+                value={addMemRelationship}
+                onChange={(e) =>
+                  setAddMemRelationship(e.target.value as ChurchRelationship)
+                }
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-bold"
+              >
+                {CHURCH_RELATIONSHIP.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
+                Tempo de Frequência
+              </label>
+              <select
+                value={addMemAttendanceTime}
+                onChange={(e) =>
+                  setAddMemAttendanceTime(e.target.value as AttendanceTime)
+                }
+                className="w-full rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs sm:text-sm font-bold"
+              >
+                {ATTENDANCE_TIME.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Se Admin: opção de promover diretamente a Pastor ou Admin */}
+          {session?.isAdmin && (
+            <div className="p-3.5 rounded-2xl bg-[#252525] text-[#DCDACF] space-y-2">
+              <span className="block text-[11px] font-black uppercase text-[#CB4B3B]">
+                Privilégios Especiais (Administrador)
+              </span>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={addMemIsPastor}
+                    onChange={(e) => {
+                      setAddMemIsPastor(e.target.checked);
+                      if (!e.target.checked) setAddMemIsAdmin(false);
+                    }}
+                    className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
+                  />
+                  <span className="text-xs font-bold">
+                    🤝 Definir como Pastor da Igreja
+                  </span>
+                </label>
+
+                {addMemIsPastor && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addMemIsAdmin}
+                      onChange={(e) => setAddMemIsAdmin(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
+                    />
+                    <span className="text-xs font-bold text-amber-300">
+                      👑 Conceder Acesso Admin Total
+                    </span>
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsAddMemberModalOpen(false)}
+              className="px-4 py-2.5 rounded-xl bg-[#DCDACF] hover:bg-[#C7C4B5] text-[#252525] text-xs font-bold uppercase tracking-wider"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSavingAddMember}
+              className="px-6 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow"
+            >
+              {isSavingAddMember ? "Cadastrando..." : "Concluir Cadastro de Membro"}
+            </button>
+          </div>
+        </form>
+      </LightDismissDialog>
 
       {/* MODAL: ADICIONAR FILHO / DEPENDENTE (< 16 ANOS) */}
       <LightDismissDialog
