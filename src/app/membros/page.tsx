@@ -20,6 +20,8 @@ import {
 } from "@/types/visitas";
 import {
   ATTENDANCE_TIME,
+  CHURCH_MINISTRIES,
+  ALL_MINISTRY_IDS,
   CHURCH_RELATIONSHIP,
   MARITAL_STATUS,
   REQUEST_REASONS,
@@ -78,6 +80,10 @@ import {
   Filter,
   Check,
   X,
+  Star,
+  Music,
+  Award,
+  MessageCircle,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
@@ -86,6 +92,7 @@ type ActiveTab =
   | "todos-membros"
   | "gestao-pastores"
   | "visitas-cuidado"
+  | "ministerios"
   | "familia"
   | "solicitar-visita"
   | "minhas-solicitacoes"
@@ -126,6 +133,7 @@ export default function PortalDoMembroPage() {
   const [regAttendanceTime, setRegAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
   const [regParticipates, setRegParticipates] = useState<"Sim" | "Não">("Não");
   const [regActivityName, setRegActivityName] = useState("");
+  const [regCurrentMinistries, setRegCurrentMinistries] = useState<string[]>([]);
 
   // Dados do Membro Logado
   const [memberData, setMemberData] = useState<Member | null>(null);
@@ -200,9 +208,28 @@ export default function PortalDoMembroPage() {
   const [editAttendanceTime, setEditAttendanceTime] = useState<AttendanceTime | "">("");
   const [editParticipates, setEditParticipates] = useState<"Sim" | "Não">("Não");
   const [editActivityName, setEditActivityName] = useState("");
+  const [editCurrentMinistries, setEditCurrentMinistries] = useState<string[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Estados da Aba Ministérios (Voluntariado e Áreas de Interesse)
+  const [myCurrentMinistries, setMyCurrentMinistries] = useState<string[]>([]);
+  const [myInterestedMinistries, setMyInterestedMinistries] = useState<string[]>([]);
+  const [isSavingMinistries, setIsSavingMinistries] = useState(false);
+  const [ministryFeedback, setMinistryFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  // Relatório de Ministérios (Pastores e Admins)
+  const [ministryViewMode, setMinistryViewMode] = useState<"relatorio" | "meu-formulario">("relatorio");
+  const [filterMinistryId, setFilterMinistryId] = useState<string>("todos");
+  const [filterMinistryStatus, setFilterMinistryStatus] = useState<"todos" | "interessados" | "atuantes">("todos");
+  const [ministrySearchQuery, setMinistrySearchQuery] = useState("");
+
+  // Modal de Detalhes do Perfil do Membro (Aba Todos os Membros)
+  const [selectedMemberDetail, setSelectedMemberDetail] = useState<Member | null>(null);
 
   // Estados de Gestão de Membros, Pastores e Visitas (Admin & Pastor)
   const [allMembers, setAllMembers] = useState<Member[]>([]);
@@ -240,6 +267,7 @@ export default function PortalDoMembroPage() {
   const [addMemAttendanceTime, setAddMemAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
   const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não">("Não");
   const [addMemActivityName, setAddMemActivityName] = useState("");
+  const [addMemCurrentMinistries, setAddMemCurrentMinistries] = useState<string[]>([]);
   const [addMemPassword, setAddMemPassword] = useState("igrejadoalto");
   const [addMemIsPastor, setAddMemIsPastor] = useState(false);
   const [addMemIsAdmin, setAddMemIsAdmin] = useState(false);
@@ -278,6 +306,8 @@ export default function PortalDoMembroPage() {
       const data = await res.json();
       if (res.ok && data.member) {
         setMemberData(data.member);
+        setMyCurrentMinistries(data.member.currentMinistries || []);
+        setMyInterestedMinistries(data.member.interestedMinistries || []);
         setSpouseData(data.spouse || null);
         setDependents(data.dependents || []);
         setMyRequests(data.requests || []);
@@ -315,6 +345,10 @@ export default function PortalDoMembroPage() {
 
       setSession(data.session);
       setMemberData(data.member);
+      if (data.member) {
+        setMyCurrentMinistries(data.member.currentMinistries || []);
+        setMyInterestedMinistries(data.member.interestedMinistries || []);
+      }
       if (data.allMembers) setAllMembers(data.allMembers);
       if (data.pastors) setPastorsList(data.pastors);
       if (data.reports) setAllReports(data.reports);
@@ -333,6 +367,48 @@ export default function PortalDoMembroPage() {
       setAuthError(err instanceof Error ? err.message : "Erro ao efetuar login.");
     } finally {
       setIsAuthLoading(false);
+    }
+  };
+
+  const handleSaveMinistries = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!session) return;
+    setIsSavingMinistries(true);
+    setMinistryFeedback(null);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "MEMBER_UPDATE_MINISTRIES",
+          payload: {
+            memberId: session.id,
+            currentMinistries: myCurrentMinistries,
+            interestedMinistries: myInterestedMinistries,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao atualizar preferências ministeriais.");
+      }
+      if (data.member) {
+        setMemberData(data.member);
+      }
+      if (data.allMembers) {
+        setAllMembers(data.allMembers);
+      }
+      setMinistryFeedback({
+        type: "success",
+        text: "Ministérios e áreas de interesse atualizados com sucesso!",
+      });
+    } catch (err) {
+      setMinistryFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao salvar preferências ministeriais.",
+      });
+    } finally {
+      setIsSavingMinistries(false);
     }
   };
 
@@ -384,6 +460,7 @@ export default function PortalDoMembroPage() {
               neighborhood: regNeighborhood,
               city: regCity,
             },
+            currentMinistries: regCurrentMinistries,
             password: regPassword,
           },
         }),
@@ -396,6 +473,10 @@ export default function PortalDoMembroPage() {
 
       setSession(data.session);
       setMemberData(data.member);
+      if (data.member) {
+        setMyCurrentMinistries(data.member.currentMinistries || []);
+        setMyInterestedMinistries(data.member.interestedMinistries || []);
+      }
       try {
         window.localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(data.session));
       } catch {
@@ -714,6 +795,7 @@ export default function PortalDoMembroPage() {
     setEditAttendanceTime(memberData.attendanceTime || "");
     setEditParticipates(memberData.participatesInActivity ? "Sim" : "Não");
     setEditActivityName(memberData.activityName || "");
+    setEditCurrentMinistries(memberData.currentMinistries || []);
     setEditError(null);
     setEditSuccess(null);
     setIsEditingProfile(true);
@@ -774,6 +856,7 @@ export default function PortalDoMembroPage() {
                 neighborhood: editNeighborhood.trim(),
                 city: editCity.trim() || "Mogi das Cruzes",
               },
+              currentMinistries: editCurrentMinistries,
               password: editPassword.trim() || undefined,
             },
           },
@@ -872,6 +955,7 @@ export default function PortalDoMembroPage() {
               neighborhood: addMemNeighborhood.trim(),
               city: addMemCity.trim() || "Mogi das Cruzes",
             },
+            currentMinistries: addMemCurrentMinistries,
             password: addMemPassword.trim() || "igrejadoalto",
             isPastor: Boolean(addMemIsPastor),
             isAdmin: Boolean(addMemIsAdmin),
@@ -901,6 +985,7 @@ export default function PortalDoMembroPage() {
       setAddMemNumber("");
       setAddMemComplement("");
       setAddMemNeighborhood("");
+      setAddMemCurrentMinistries([]);
       setAddMemIsPastor(false);
       setAddMemIsAdmin(false);
     } catch (err) {
@@ -1588,6 +1673,66 @@ export default function PortalDoMembroPage() {
                         />
                       </div>
                     )}
+
+                    {/* Ministérios que já pertence atualmente */}
+                    <div className="space-y-2 pt-2 border-t border-[#252525]/15">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                          Ministérios em que você já atua atualmente (Opcional)
+                        </label>
+                        <span className="text-[11px] font-bold text-[#CB4B3B]">
+                          {regCurrentMinistries.length} selecionado(s)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#252525]/70">
+                        Selecione as áreas em que você já serve na Igreja do Alto (pode selecionar mais de uma):
+                      </p>
+                      <div className="space-y-3 pt-1">
+                        {CHURCH_MINISTRIES.map((group) => (
+                          <div key={group.category} className="space-y-1.5">
+                            <span className="block text-[10px] font-black uppercase tracking-wider text-[#CB4B3B]">
+                              {group.category}
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {group.items.map((item) => {
+                                const isChecked = regCurrentMinistries.includes(item.id);
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setRegCurrentMinistries((prev) =>
+                                        isChecked
+                                          ? prev.filter((m) => m !== item.id)
+                                          : [...prev, item.id]
+                                      );
+                                    }}
+                                    className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                                      isChecked
+                                        ? "border-[#CB4B3B] bg-[#CB4B3B]/10 text-[#252525] font-bold"
+                                        : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/80 text-xs"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${
+                                        isChecked
+                                          ? "bg-[#CB4B3B] border-[#CB4B3B] text-white"
+                                          : "border-[#252525]/40 bg-white"
+                                      }`}
+                                    >
+                                      {isChecked && <Check className="w-2.5 h-2.5" />}
+                                    </div>
+                                    <span className="text-[11px] leading-tight flex-1">
+                                      {item.label}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Senha e Confirmação */}
@@ -1712,6 +1857,43 @@ export default function PortalDoMembroPage() {
     );
   });
 
+  const totalVolunteersActive = allMembers.filter(
+    (m) => (m.currentMinistries || []).length > 0
+  ).length;
+
+  const totalVolunteersInterested = allMembers.filter(
+    (m) => (m.interestedMinistries || []).length > 0
+  ).length;
+
+  const filteredVolunteers = allMembers.filter((m) => {
+    const current = m.currentMinistries || [];
+    const interested = m.interestedMinistries || [];
+    const hasAny = current.length > 0 || interested.length > 0;
+
+    // Filter by Ministry ID
+    if (filterMinistryId !== "todos") {
+      const inCurrent = current.includes(filterMinistryId);
+      const inInterested = interested.includes(filterMinistryId);
+      if (!inCurrent && !inInterested) return false;
+      if (filterMinistryStatus === "atuantes" && !inCurrent) return false;
+      if (filterMinistryStatus === "interessados" && !inInterested) return false;
+    } else {
+      if (filterMinistryStatus === "atuantes" && current.length === 0) return false;
+      if (filterMinistryStatus === "interessados" && interested.length === 0) return false;
+      if (filterMinistryStatus === "todos" && !hasAny) return false;
+    }
+
+    // Search query
+    const q = ministrySearchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      m.name.toLowerCase().includes(q) ||
+      (m.phone && m.phone.includes(q)) ||
+      current.some((min) => min.toLowerCase().includes(q)) ||
+      interested.some((min) => min.toLowerCase().includes(q))
+    );
+  });
+
   // =========================================================================
   // TELA LOGADO: PORTAL DO MEMBRO & NÚCLEO FAMILIAR
   // =========================================================================
@@ -1776,6 +1958,11 @@ export default function PortalDoMembroPage() {
                 icon: Users,
               });
               tabs.push({
+                id: "ministerios",
+                label: "Ministérios & Voluntários",
+                icon: Sparkles,
+              });
+              tabs.push({
                 id: "visitas-cuidado",
                 label: "Visitas por Pessoas",
                 icon: ClipboardCheck,
@@ -1795,6 +1982,15 @@ export default function PortalDoMembroPage() {
               label: `Minha Família (${dependents.length + (spouseData ? 2 : 1)})`,
               icon: Home,
             });
+
+            if (!session.isAdmin && !session.isPastor) {
+              tabs.push({
+                id: "ministerios",
+                label: "Ministérios",
+                icon: Sparkles,
+              });
+            }
+
             tabs.push({
               id: "solicitar-visita",
               label: "Solicitar Visita",
@@ -2609,6 +2805,73 @@ export default function PortalDoMembroPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Bloco de Ministérios em Visualização */}
+                <div className="p-4 rounded-2xl bg-white border border-[#252525]/15 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#252525]/10">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#CB4B3B]" />
+                      <h3 className="text-xs font-black uppercase tracking-wide text-[#252525]">
+                        Envolvimento em Ministérios
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("ministerios")}
+                      className="text-[11px] font-bold text-[#CB4B3B] hover:underline"
+                    >
+                      Gerenciar na Aba Ministérios →
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-1.5">
+                        Ministérios em que já atua atualmente:
+                      </span>
+                      {memberData.currentMinistries && memberData.currentMinistries.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {memberData.currentMinistries.map((m) => (
+                            <span
+                              key={m}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1"
+                            >
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#252525]/60 italic">
+                          Nenhum ministério informado até o momento.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-1.5">
+                        Áreas com interesse em servir:
+                      </span>
+                      {memberData.interestedMinistries && memberData.interestedMinistries.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {memberData.interestedMinistries.map((m) => (
+                            <span
+                              key={m}
+                              className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1"
+                            >
+                              <Star className="w-3 h-3 text-amber-600" />
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#252525]/60 italic">
+                          Ainda não selecionou áreas de interesse.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               /* MODO EDIÇÃO */
@@ -2999,6 +3262,66 @@ export default function PortalDoMembroPage() {
                       />
                     </div>
                   )}
+
+                  {/* Ministérios que já serve */}
+                  <div className="space-y-2 pt-2 border-t border-[#252525]/15">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Ministérios em que você já atua atualmente
+                      </label>
+                      <span className="text-[11px] font-bold text-[#CB4B3B]">
+                        {editCurrentMinistries.length} selecionado(s)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#252525]/70">
+                      Atualize as áreas em que você já serve na Igreja do Alto:
+                    </p>
+                    <div className="space-y-2.5 pt-1">
+                      {CHURCH_MINISTRIES.map((group) => (
+                        <div key={group.category} className="space-y-1">
+                          <span className="block text-[10px] font-black uppercase tracking-wider text-[#CB4B3B]">
+                            {group.category}
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {group.items.map((item) => {
+                              const isChecked = editCurrentMinistries.includes(item.id);
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditCurrentMinistries((prev) =>
+                                      isChecked
+                                        ? prev.filter((m) => m !== item.id)
+                                        : [...prev, item.id]
+                                    );
+                                  }}
+                                  className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                                    isChecked
+                                      ? "border-[#CB4B3B] bg-[#CB4B3B]/10 text-[#252525] font-bold"
+                                      : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/80 text-xs"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${
+                                      isChecked
+                                        ? "bg-[#CB4B3B] border-[#CB4B3B] text-white"
+                                        : "border-[#252525]/40 bg-white"
+                                    }`}
+                                  >
+                                    {isChecked && <Check className="w-2.5 h-2.5" />}
+                                  </div>
+                                  <span className="text-[11px] leading-tight flex-1">
+                                    {item.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* SEGURANÇA / ALTERAR SENHA */}
@@ -3182,150 +3505,702 @@ export default function PortalDoMembroPage() {
               </div>
             </div>
 
-            {/* Lista dos Membros (Cards) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredMembers.map((m) => {
-                const isPastor = Boolean(
-                  m.isPastor ||
-                    m.portalRole === "pastor" ||
-                    m.portalRole === "admin"
-                );
-                const isAdmin = Boolean(m.isAdmin || m.portalRole === "admin");
+            {/* Lista dos Membros em Formato de Lista / Tabela */}
+            {filteredMembers.length === 0 ? (
+              <div className="p-8 text-center rounded-3xl bg-[#F4F3EE] border-2 border-dashed border-[#252525]/20 space-y-2">
+                <Users className="w-8 h-8 text-[#CB4B3B] mx-auto" />
+                <p className="text-sm font-bold text-[#252525]">
+                  Nenhum membro encontrado com os filtros selecionados.
+                </p>
+                <p className="text-xs text-[#252525]/60">
+                  Verifique a digitação ou selecione outra categoria de filtro.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-3xl bg-white border border-[#252525]/15 shadow-sm overflow-hidden">
+                {/* Cabeçalho da Tabela (Desktop) */}
+                <div className="hidden lg:grid grid-cols-12 gap-3 px-6 py-3 bg-[#252525] text-[#DCDACF] text-[11px] font-black uppercase tracking-wider">
+                  <div className="col-span-4">Membro / Identificação</div>
+                  <div className="col-span-3">Contato & Acesso</div>
+                  <div className="col-span-3">Localização & Ministérios</div>
+                  <div className="col-span-2 text-right">Ações</div>
+                </div>
 
-                return (
-                  <div
-                    key={m.id}
-                    className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm hover:shadow-md transition-shadow space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-[#DCDACF] text-[#252525] flex items-center justify-center font-black text-lg shrink-0">
-                          {m.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-black text-[#252525] leading-tight">
-                              {m.name}
-                            </h3>
-                            {isAdmin && (
-                              <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
-                                👑 Admin Total
-                              </span>
-                            )}
-                            {isPastor && !isAdmin && (
-                              <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider">
-                                🤝 Pastor
-                              </span>
-                            )}
+                <div className="divide-y divide-[#252525]/10">
+                  {filteredMembers.map((m) => {
+                    const isPastor = Boolean(
+                      m.isPastor ||
+                        m.portalRole === "pastor" ||
+                        m.portalRole === "admin"
+                    );
+                    const isAdmin = Boolean(m.isAdmin || m.portalRole === "admin");
+                    const currentMinistries = m.currentMinistries || [];
+                    const interestedMinistries = m.interestedMinistries || [];
+                    const cleanPhone = cleanDigits(m.phone || "");
+                    const whatsappUrl = cleanPhone
+                      ? `https://wa.me/55${cleanPhone}`
+                      : null;
+
+                    return (
+                      <div
+                        key={m.id}
+                        className="px-5 py-3.5 hover:bg-[#F9F8F5] transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 items-start lg:items-center cursor-pointer group"
+                        onClick={() => setSelectedMemberDetail(m)}
+                      >
+                        {/* Coluna 1: Membro / Identificação */}
+                        <div className="lg:col-span-4 flex items-center gap-3 w-full">
+                          <div className="w-10 h-10 rounded-2xl bg-[#DCDACF] text-[#252525] group-hover:bg-[#CB4B3B] group-hover:text-white transition-colors flex items-center justify-center font-black text-sm shrink-0">
+                            {m.name.slice(0, 2).toUpperCase()}
                           </div>
-                          <span className="inline-block mt-0.5 text-xs font-bold text-[#252525]/60">
-                            {m.relationship || "Membro"} • {m.maritalStatus || "Solteiro(a)"}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-black text-[#252525] truncate">
+                                {m.name}
+                              </span>
+                              {isAdmin && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[9px] font-black uppercase tracking-wider">
+                                  👑 Admin
+                                </span>
+                              )}
+                              {isPastor && !isAdmin && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-[#252525] text-white text-[9px] font-black uppercase tracking-wider">
+                                  🤝 Pastor
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-[#252525]/60 mt-0.5">
+                              <span>{m.relationship || "Membro"}</span>
+                              {m.cpf && <span>• CPF: {formatCPF(m.cpf)}</span>}
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      <span className="px-2.5 py-1 rounded-xl bg-[#F4F3EE] text-[11px] font-extrabold text-[#252525]/80">
-                        {m.attendanceTime || "Membro"}
-                      </span>
-                    </div>
+                        {/* Coluna 2: Contato & Acesso */}
+                        <div className="lg:col-span-3 text-xs font-semibold text-[#252525]/80 space-y-0.5 w-full">
+                          {m.phone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-[#CB4B3B] shrink-0" />
+                              <span className="font-bold">{formatPhoneBR(m.phone)}</span>
+                              {whatsappUrl && (
+                                <a
+                                  href={whatsappUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] text-emerald-700 hover:text-emerald-800 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                                  title="Abrir conversa no WhatsApp"
+                                >
+                                  WhatsApp ↗
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          {m.email && (
+                            <div className="flex items-center gap-1.5 truncate text-[#252525]/65">
+                              <Mail className="w-3 h-3 text-[#252525]/40 shrink-0" />
+                              <span className="truncate">{m.email}</span>
+                            </div>
+                          )}
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-[#252525]/80 pt-2 border-t border-[#252525]/10">
-                      {m.phone && (
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-[#CB4B3B] shrink-0" />
-                          <span>{formatPhoneBR(m.phone)}</span>
-                        </div>
-                      )}
-                      {m.cpf && (
-                        <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
-                          <span>CPF: {formatCPF(m.cpf)}</span>
-                        </div>
-                      )}
-                      {m.email && (
-                        <div className="flex items-center gap-1.5 sm:col-span-2 truncate">
-                          <Mail className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
-                          <span className="truncate">{m.email}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1.5 sm:col-span-2 text-[#252525]/70">
-                        <MapPin className="w-3.5 h-3.5 text-[#252525]/60 shrink-0" />
-                        <span className="truncate">{formatAddress(m.address)}</span>
-                      </div>
-                    </div>
-
-                    {/* Informações da Família */}
-                    {(m.spouseName || (m.dependents && m.dependents.length > 0)) && (
-                      <div className="p-2.5 rounded-xl bg-[#F4F3EE] text-xs font-semibold text-[#252525]/80 space-y-1">
-                        {m.spouseName && (
-                          <div className="flex items-center gap-1.5">
-                            <Heart className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                            <span>
-                              Cônjuge: <strong>{m.spouseName}</strong>
+                        {/* Coluna 3: Localização & Ministérios */}
+                        <div className="lg:col-span-3 text-xs space-y-1 w-full">
+                          <div className="flex items-center gap-1 text-[#252525]/70 font-semibold truncate">
+                            <MapPin className="w-3 h-3 text-[#252525]/40 shrink-0" />
+                            <span className="truncate">
+                              {m.address?.neighborhood ? `${m.address.neighborhood}, ` : ""}
+                              {m.address?.city || "Mogi das Cruzes"}
                             </span>
                           </div>
-                        )}
-                        {m.dependents && m.dependents.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <Baby className="w-3.5 h-3.5 text-[#252525]/60" />
-                            <span>
-                              Filhos / Dependentes:{" "}
-                              <strong>
-                                {m.dependents
-                                  .map((d) => d.fullName || (d as any).name)
-                                  .join(", ")}
-                              </strong>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* Ações Administrativas (Exclusivo para Administrador) */}
-                    {session?.isAdmin && (
-                      <div className="pt-2 border-t border-[#252525]/10 flex flex-wrap items-center justify-between gap-2">
-                        {!isPastor ? (
+                          {/* Tags de Ministérios */}
+                          <div className="flex flex-wrap items-center gap-1">
+                            {currentMinistries.length > 0 ? (
+                              <>
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black truncate max-w-[130px]">
+                                  ✓ {currentMinistries[0]}
+                                </span>
+                                {currentMinistries.length > 1 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                                    +{currentMinistries.length - 1}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-[#252525]/40 italic">
+                                Sem ministério atual
+                              </span>
+                            )}
+
+                            {interestedMinistries.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold flex items-center gap-0.5">
+                                <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                                {interestedMinistries.length} interesse(s)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Coluna 4: Ações */}
+                        <div className="lg:col-span-2 flex items-center justify-end gap-2 w-full pt-2 lg:pt-0 border-t lg:border-t-0 border-[#252525]/10">
                           <button
                             type="button"
-                            onClick={() => handleSetMemberPastor(m, true, false)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-white text-xs font-black uppercase tracking-wider transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMemberDetail(m);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#252525] group-hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
                           >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Definir como Pastor</span>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Ver Perfil</span>
                           </button>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2">
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================================================================
+            ABA: MINISTÉRIOS (Atuação Atual & Interesse em Servir)
+           =================================================================== */}
+        {activeTab === "ministerios" && (
+          <div className="space-y-6">
+            {/* Cabeçalho da Aba */}
+            <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" />
+                  Corpo de Cristo em Ação
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#252525] mt-1">
+                  Ministérios & Voluntariado
+                </h2>
+                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1">
+                  {session.isAdmin || session.isPastor
+                    ? "Gerencie as equipes ministeriais, veja voluntários atuantes e responda a pessoas interessadas em servir."
+                    : "Descubra os ministérios da Igreja do Alto, atualize onde você serve e indique as áreas em que deseja participar."}
+                </p>
+              </div>
+
+              {/* Se for Pastor ou Admin: seletor de visualização (Relatório vs Meu Formulário) */}
+              {(session.isAdmin || session.isPastor) && (
+                <div className="flex bg-[#252525] p-1.5 rounded-2xl gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMinistryViewMode("relatorio")}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                      ministryViewMode === "relatorio"
+                        ? "bg-[#CB4B3B] text-white shadow"
+                        : "text-[#DCDACF]/70 hover:text-white"
+                    }`}
+                  >
+                    Relatório Geral de Voluntários
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMinistryViewMode("meu-formulario")}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                      ministryViewMode === "meu-formulario"
+                        ? "bg-[#CB4B3B] text-white shadow"
+                        : "text-[#DCDACF]/70 hover:text-white"
+                    }`}
+                  >
+                    Meu Envolvimento Pessoal
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* FEEDBACK DE ATUALIZAÇÃO */}
+            {ministryFeedback && (
+              <div
+                className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${
+                  ministryFeedback.type === "success"
+                    ? "bg-emerald-950 text-[#DCDACF] border-emerald-600"
+                    : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  {ministryFeedback.type === "success" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-[#CB4B3B] shrink-0" />
+                  )}
+                  <span>{ministryFeedback.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMinistryFeedback(null)}
+                  className="opacity-70 hover:opacity-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* MODO 1: RELATÓRIO DE VOLUNTÁRIOS (LIDERANÇA & PASTORES) */}
+            {(session.isAdmin || session.isPastor) && ministryViewMode === "relatorio" ? (
+              <div className="space-y-6">
+                {/* Indicadores do Relatório */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                      <Check className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#252525]/60">
+                        Voluntários Atuantes
+                      </span>
+                      <strong className="text-2xl font-black text-emerald-700">
+                        {totalVolunteersActive} pessoas
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
+                      <Star className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#252525]/60">
+                        Interessados em Servir
+                      </span>
+                      <strong className="text-2xl font-black text-amber-700">
+                        {totalVolunteersInterested} pessoas
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#252525] text-white flex items-center justify-center shrink-0">
+                      <Award className="w-5 h-5 text-[#EBD57B]" />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#252525]/60">
+                        Total de Ministérios
+                      </span>
+                      <strong className="text-2xl font-black text-[#252525]">
+                        {ALL_MINISTRY_IDS.length} áreas
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtros do Relatório */}
+                <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 space-y-3">
+                  <div className="flex flex-col md:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={ministrySearchQuery}
+                        onChange={(e) => setMinistrySearchQuery(e.target.value)}
+                        placeholder="Buscar por voluntário, telefone ou ministério..."
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold"
+                      />
+                    </div>
+
+                    <div className="w-full md:w-80">
+                      <select
+                        value={filterMinistryId}
+                        onChange={(e) => setFilterMinistryId(e.target.value)}
+                        className="w-full py-2.5 px-3 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-bold text-[#252525]"
+                      >
+                        <option value="todos">Todos os Ministérios</option>
+                        {CHURCH_MINISTRIES.map((group) => (
+                          <optgroup key={group.category} label={group.category}>
+                            {group.items.map((item) => {
+                              const activeCount = allMembers.filter((m) =>
+                                (m.currentMinistries || []).includes(item.id)
+                              ).length;
+                              const interestedCount = allMembers.filter((m) =>
+                                (m.interestedMinistries || []).includes(item.id)
+                              ).length;
+                              return (
+                                <option key={item.id} value={item.id}>
+                                  {item.label} ({activeCount} atuam • {interestedCount} interessados)
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#252525]/10">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {[
+                        { id: "todos", label: "Todos os Registros" },
+                        { id: "interessados", label: "⭐ Apenas Interessados em Servir" },
+                        { id: "atuantes", label: "✓ Apenas Atuantes Atuais" },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setFilterMinistryStatus(st.id as any)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                            filterMinistryStatus === st.id
+                              ? "bg-[#252525] text-white"
+                              : "bg-white text-[#252525]/80 hover:bg-[#DCDACF]"
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <span className="text-xs font-bold text-[#252525]/60">
+                      {filteredVolunteers.length} pessoa(s) encontrada(s)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Lista de Voluntários do Relatório */}
+                {filteredVolunteers.length === 0 ? (
+                  <div className="p-8 text-center rounded-3xl bg-[#F4F3EE] border-2 border-dashed border-[#252525]/20 space-y-2">
+                    <Sparkles className="w-8 h-8 text-[#CB4B3B] mx-auto" />
+                    <p className="text-sm font-bold text-[#252525]">
+                      Nenhum voluntário encontrado com os filtros selecionados.
+                    </p>
+                    <p className="text-xs text-[#252525]/60">
+                      Tente alterar o ministério selecionado ou o modo de busca.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredVolunteers.map((m) => {
+                      const current = m.currentMinistries || [];
+                      const interested = m.interestedMinistries || [];
+                      const isPastor = Boolean(m.isPastor || m.portalRole === "pastor" || m.portalRole === "admin");
+                      const isAdmin = Boolean(m.isAdmin || m.portalRole === "admin");
+                      const cleanPhone = cleanDigits(m.phone || "");
+                      const whatsappUrl = cleanPhone
+                        ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
+                            `Olá ${m.name}! Aqui é da liderança da Igreja do Alto sobre os ministérios da igreja.`
+                          )}`
+                        : null;
+
+                      return (
+                        <div
+                          key={m.id}
+                          className="p-5 rounded-2xl bg-white border border-[#252525]/15 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-2 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMemberDetail(m)}
+                                className="text-base font-black text-[#252525] hover:text-[#CB4B3B] text-left transition-colors flex items-center gap-1.5"
+                              >
+                                <span>{m.name}</span>
+                              </button>
+                              {isAdmin && (
+                                <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                                  👑 Admin Total
+                                </span>
+                              )}
+                              {isPastor && !isAdmin && (
+                                <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider">
+                                  🤝 Pastor
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 rounded-md bg-[#F4F3EE] text-[#252525]/70 text-[10px] font-bold">
+                                {m.attendanceTime || "Membro"}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-[#252525]/75 font-semibold">
+                              {m.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                                  <span>{formatPhoneBR(m.phone)}</span>
+                                </div>
+                              )}
+                              {m.email && (
+                                <div className="flex items-center gap-1">
+                                  <Mail className="w-3.5 h-3.5 text-[#252525]/50" />
+                                  <span>{m.email}</span>
+                                </div>
+                              )}
+                              {m.address?.neighborhood && (
+                                <div className="flex items-center gap-1 text-[#252525]/60">
+                                  <MapPin className="w-3.5 h-3.5 text-[#252525]/40" />
+                                  <span>{m.address.neighborhood}, {m.address.city || "Mogi das Cruzes"}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Ministérios Atuantes */}
+                            {current.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                                  Já atua ({current.length}):
+                                </span>
+                                {current.map((min) => (
+                                  <span
+                                    key={min}
+                                    className={`px-2 py-0.5 rounded-md text-xs font-bold border ${
+                                      filterMinistryId === min
+                                        ? "bg-emerald-600 text-white border-emerald-600"
+                                        : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    }`}
+                                  >
+                                    ✓ {min}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Ministérios com Interesse em Servir */}
+                            {interested.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                                  Interesse em Servir ({interested.length}):
+                                </span>
+                                {interested.map((min) => (
+                                  <span
+                                    key={min}
+                                    className={`px-2 py-0.5 rounded-md text-xs font-bold border ${
+                                      filterMinistryId === min
+                                        ? "bg-amber-600 text-white border-amber-600"
+                                        : "bg-amber-50 text-amber-900 border-amber-300"
+                                    }`}
+                                  >
+                                    ⭐ {min}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Ações Rápidas de Contato */}
+                          <div className="flex md:flex-col items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#252525]/10">
+                            {whatsappUrl && (
+                              <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                                title="Enviar mensagem no WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
                             <button
                               type="button"
-                              onClick={() => handleSetMemberPastor(m, true, !isAdmin)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
-                                isAdmin
-                                  ? "bg-white text-[#252525] border border-[#252525]/30 hover:bg-[#DCDACF]"
-                                  : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
-                              }`}
+                              onClick={() => setSelectedMemberDetail(m)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-bold transition-colors"
                             >
-                              {isAdmin ? "Rebaixar p/ Pastor" : "👑 Tornar Admin Total"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSetMemberPastor(m, false, false)}
-                              className="px-2.5 py-1.5 rounded-xl bg-[#F9EAE8] hover:bg-[#CB4B3B] text-[#CB4B3B] hover:text-white text-xs font-bold transition-colors"
-                              title="Remover função pastoral"
-                            >
-                              Remover Pastor
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Ver Perfil</span>
                             </button>
                           </div>
-                        )}
-
-                        <span className="text-[11px] font-bold text-[#252525]/50 ml-auto">
-                          ID: {m.id}
-                        </span>
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            ) : (
+              /* MODO 2: FORMULÁRIO PESSOAL DE MINISTÉRIOS (DO MEMBRO) */
+              <form onSubmit={handleSaveMinistries} className="space-y-6">
+                {/* SEÇÃO 1: MINISTÉRIOS EM QUE JÁ ATUA */}
+                <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#252525]/15 flex-wrap gap-2">
+                    <div>
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
+                        1. Atuação Atual
+                      </span>
+                      <h3 className="text-lg sm:text-xl font-black uppercase text-[#252525]">
+                        Ministérios em que você já atua atualmente
+                      </h3>
+                      <p className="text-xs text-[#252525]/70 mt-0.5">
+                        Marque as áreas onde você já serve ativamente na nossa igreja.
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider border border-emerald-300">
+                      {myCurrentMinistries.length} selecionado(s)
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {CHURCH_MINISTRIES.map((group) => (
+                      <div key={`cur-${group.category}`} className="space-y-2">
+                        <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                          {group.category}
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {group.items.map((item) => {
+                            const isChecked = myCurrentMinistries.includes(item.id);
+                            return (
+                              <button
+                                key={`cur-${item.id}`}
+                                type="button"
+                                onClick={() => {
+                                  setMyCurrentMinistries((prev) =>
+                                    isChecked
+                                      ? prev.filter((m) => m !== item.id)
+                                      : [...prev, item.id]
+                                  );
+                                }}
+                                className={`flex items-start gap-2.5 p-3 rounded-2xl border-2 text-left transition-all ${
+                                  isChecked
+                                    ? "border-emerald-600 bg-white shadow-sm ring-1 ring-emerald-600"
+                                    : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/85"
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 mt-0.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                    isChecked
+                                      ? "bg-emerald-600 border-emerald-600 text-white"
+                                      : "border-[#252525]/40 bg-white"
+                                  }`}
+                                >
+                                  {isChecked && <Check className="w-3 h-3" />}
+                                </div>
+                                <div>
+                                  <span className="block text-xs font-bold leading-snug text-[#252525]">
+                                    {item.label}
+                                  </span>
+                                  {item.description && (
+                                    <span className="block text-[10px] text-[#252525]/60 mt-0.5 leading-tight">
+                                      {item.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SEÇÃO 2: MINISTÉRIOS COM INTERESSE EM SERVIR */}
+                <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#252525]/15 flex-wrap gap-2">
+                    <div>
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
+                        2. Desejo de Servir
+                      </span>
+                      <h3 className="text-lg sm:text-xl font-black uppercase text-[#252525]">
+                        Ministérios em que você tem interesse em participar / servir
+                      </h3>
+                      <p className="text-xs text-[#252525]/70 mt-0.5">
+                        Indique as áreas onde você gostaria de começar a servir. Pode escolher mais de uma opção.
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-wider border border-amber-300">
+                      {myInterestedMinistries.length} selecionado(s)
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {CHURCH_MINISTRIES.map((group) => {
+                      const isLouvorGroup = group.category === "Ministério de Louvor";
+                      return (
+                        <div key={`int-${group.category}`} className="space-y-2">
+                          <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+                            {group.category}
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {group.items.map((item) => {
+                              const isChecked = myInterestedMinistries.includes(item.id);
+                              return (
+                                <button
+                                  key={`int-${item.id}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setMyInterestedMinistries((prev) =>
+                                      isChecked
+                                        ? prev.filter((m) => m !== item.id)
+                                        : [...prev, item.id]
+                                    );
+                                  }}
+                                  className={`flex items-start gap-2.5 p-3 rounded-2xl border-2 text-left transition-all ${
+                                    isChecked
+                                      ? "border-amber-600 bg-white shadow-sm ring-1 ring-amber-600"
+                                      : "border-[#252525]/20 bg-white/70 hover:bg-white text-[#252525]/85"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-4 h-4 mt-0.5 rounded-md border flex items-center justify-center shrink-0 ${
+                                      isChecked
+                                        ? "bg-amber-600 border-amber-600 text-white"
+                                        : "border-[#252525]/40 bg-white"
+                                    }`}
+                                  >
+                                    {isChecked && <Star className="w-3 h-3 fill-white" />}
+                                  </div>
+                                  <div>
+                                    <span className="block text-xs font-bold leading-snug text-[#252525]">
+                                      {item.label}
+                                    </span>
+                                    {item.description && (
+                                      <span className="block text-[10px] text-[#252525]/60 mt-0.5 leading-tight">
+                                        {item.description}
+                                      </span>
+                                    )}
+                                    {item.requiresAudition && (
+                                      <span className="inline-block mt-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                        Mediante audição
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Observação Exclusiva do Louvor no Fim */}
+                          {isLouvorGroup && (
+                            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-2.5 mt-2">
+                              <Music className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                              <div className="text-xs leading-relaxed">
+                                <strong className="font-bold block">
+                                  Observação importante para o Ministério de Louvor:
+                                </strong>
+                                <span>
+                                  O ingresso no ministério de Louvor é mediante audição e aprovação com a liderança musical da igreja. Ao marcar seu interesse, a equipe entrará em contato para agendar seu teste vocal ou instrumental.
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-4 border-t border-[#252525]/15 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-[#252525]/75">
+                      Suas respostas ajudam os pastores a direcionar os chamados ministeriais na igreja.
+                    </span>
+
+                    <button
+                      type="submit"
+                      disabled={isSavingMinistries}
+                      className="w-full sm:w-auto px-8 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isSavingMinistries ? (
+                        <span>Salvando preferências...</span>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Salvar Meus Ministérios & Interesses</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
           </div>
         )}
 
@@ -3905,6 +4780,61 @@ export default function PortalDoMembroPage() {
             </div>
           </div>
 
+          {/* Ministérios que já atua */}
+          <div className="space-y-2 pt-2 border-t border-[#252525]/15">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-black uppercase text-[#252525]">
+                Ministérios em que Já Atua Atualmente
+              </label>
+              <span className="text-[11px] font-bold text-[#CB4B3B]">
+                {addMemCurrentMinistries.length} selecionado(s)
+              </span>
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-2 p-2 rounded-xl bg-white border border-[#252525]/20">
+              {CHURCH_MINISTRIES.map((group) => (
+                <div key={group.category} className="space-y-1">
+                  <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                    {group.category}
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {group.items.map((item) => {
+                      const isChecked = addMemCurrentMinistries.includes(item.id);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setAddMemCurrentMinistries((prev) =>
+                              isChecked
+                                ? prev.filter((m) => m !== item.id)
+                                : [...prev, item.id]
+                            );
+                          }}
+                          className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-left transition-all ${
+                            isChecked
+                              ? "border-[#CB4B3B] bg-[#CB4B3B]/10 font-bold text-[#252525]"
+                              : "border-[#252525]/15 bg-white text-[#252525]/80 text-[11px]"
+                          }`}
+                        >
+                          <div
+                            className={`w-3 h-3 rounded flex items-center justify-center shrink-0 border ${
+                              isChecked
+                                ? "bg-[#CB4B3B] border-[#CB4B3B] text-white"
+                                : "border-[#252525]/40 bg-white"
+                            }`}
+                          >
+                            {isChecked && <Check className="w-2 h-2" />}
+                          </div>
+                          <span className="text-[11px] truncate">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Se Admin: opção de promover diretamente a Pastor ou Admin */}
           {session?.isAdmin && (
             <div className="p-3.5 rounded-2xl bg-[#252525] text-[#DCDACF] space-y-2">
@@ -4067,6 +4997,333 @@ export default function PortalDoMembroPage() {
             </button>
           </div>
         </form>
+      </LightDismissDialog>
+
+      {/* MODAL: DETALHES COMPLETOS DO MEMBRO (AO CLICAR NA LISTA) */}
+      <LightDismissDialog
+        open={Boolean(selectedMemberDetail)}
+        onClose={() => setSelectedMemberDetail(null)}
+        title={selectedMemberDetail?.name || "Perfil do Membro"}
+        subtitle="Visualização detalhada do cadastro e relacionamento com a igreja"
+        maxWidthClass="max-w-2xl"
+      >
+        {selectedMemberDetail && (
+          <div className="space-y-5 text-xs text-[#252525]">
+            {/* Header com Avatar, Badges e Contato Rápido */}
+            <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#CB4B3B] text-[#DCDACF] flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                  {selectedMemberDetail.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-[#252525]">
+                      {selectedMemberDetail.name}
+                    </h3>
+                    {selectedMemberDetail.isAdmin && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                        👑 Admin Total
+                      </span>
+                    )}
+                    {selectedMemberDetail.isPastor && !selectedMemberDetail.isAdmin && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider">
+                        🤝 Pastor
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-[#252525]/70 block mt-0.5">
+                    {selectedMemberDetail.relationship || "Membro"} • {selectedMemberDetail.maritalStatus || "Solteiro(a)"}
+                  </span>
+                  <span className="text-[10px] text-[#252525]/50 block">
+                    Cadastrado em {formatDateBR(selectedMemberDetail.registeredAt)} • ID: {selectedMemberDetail.id}
+                  </span>
+                </div>
+              </div>
+
+              {selectedMemberDetail.phone && (
+                <a
+                  href={`https://wa.me/55${cleanDigits(selectedMemberDetail.phone)}?text=${encodeURIComponent(
+                    `Olá ${selectedMemberDetail.name}! Paz do Senhor!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider transition-colors shadow shrink-0"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chamar no WhatsApp</span>
+                </a>
+              )}
+            </div>
+
+            {/* Grid de Informações de Contato e Documentos */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/15 space-y-1">
+                <span className="block text-[10px] font-black uppercase text-[#252525]/60">
+                  Telefone / WhatsApp
+                </span>
+                <strong className="text-sm font-black text-[#252525] flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                  {formatPhoneBR(selectedMemberDetail.phone)}
+                </strong>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/15 space-y-1">
+                <span className="block text-[10px] font-black uppercase text-[#252525]/60">
+                  E-mail
+                </span>
+                <strong className="text-sm font-black text-[#252525] truncate block">
+                  {selectedMemberDetail.email || "Não informado"}
+                </strong>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/15 space-y-1">
+                <span className="block text-[10px] font-black uppercase text-[#252525]/60">
+                  CPF (Chave Única)
+                </span>
+                <strong className="text-sm font-black text-[#252525]">
+                  {formatCPF(selectedMemberDetail.cpf)}
+                </strong>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white border border-[#252525]/15 space-y-1">
+                <span className="block text-[10px] font-black uppercase text-[#252525]/60">
+                  Data de Nascimento
+                </span>
+                <strong className="text-sm font-black text-[#252525]">
+                  {selectedMemberDetail.birthDate
+                    ? `${formatDateBR(selectedMemberDetail.birthDate)} ${
+                        calculateAge(selectedMemberDetail.birthDate)
+                          ? `(${calculateAge(selectedMemberDetail.birthDate)} anos)`
+                          : ""
+                      }`
+                    : "Não informada"}
+                </strong>
+              </div>
+            </div>
+
+            {/* Endereço Residencial */}
+            <div className="p-4 rounded-xl bg-white border border-[#252525]/15 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="block text-[10px] font-black uppercase text-[#252525]/60">
+                  Endereço Residencial
+                </span>
+                {selectedMemberDetail.address?.cep && (
+                  <span className="text-[11px] font-bold text-[#CB4B3B]">
+                    CEP: {formatCEP(selectedMemberDetail.address.cep)}
+                  </span>
+                )}
+              </div>
+              <strong className="text-sm font-black text-[#252525] block">
+                {formatAddress(selectedMemberDetail.address)}
+              </strong>
+            </div>
+
+            {/* Relacionamento com a Igreja */}
+            <div className="p-4 rounded-xl bg-white border border-[#252525]/15 space-y-3">
+              <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                Vida na Igreja & Atividades
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <span className="block text-[10px] text-[#252525]/60 font-bold uppercase">
+                    Relação com a Igreja
+                  </span>
+                  <strong className="text-xs font-black text-[#252525]">
+                    {selectedMemberDetail.relationship || "Membro"}
+                  </strong>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-[#252525]/60 font-bold uppercase">
+                    Tempo de Frequência
+                  </span>
+                  <strong className="text-xs font-black text-[#252525]">
+                    {selectedMemberDetail.attendanceTime || "Não informado"}
+                  </strong>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="block text-[10px] text-[#252525]/60 font-bold uppercase">
+                    Participa de Casa do Alto / Atividade
+                  </span>
+                  <strong className="text-xs font-black text-[#252525]">
+                    {selectedMemberDetail.participatesInActivity
+                      ? selectedMemberDetail.activityName
+                        ? `Sim (${selectedMemberDetail.activityName})`
+                        : "Sim"
+                      : "Não participa"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Ministérios Atuantes & Interesses */}
+            <div className="p-4 rounded-xl bg-white border border-[#252525]/15 space-y-3">
+              <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                Ministérios & Voluntariado
+              </span>
+              <div className="space-y-3">
+                <div>
+                  <span className="block text-[11px] font-bold text-[#252525]/70 mb-1.5">
+                    Ministérios em que já atua atualmente:
+                  </span>
+                  {(selectedMemberDetail.currentMinistries || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMemberDetail.currentMinistries!.map((m) => (
+                        <span
+                          key={m}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1"
+                        >
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#252525]/50 italic">
+                      Nenhum ministério informado até o momento.
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-[#252525]/10">
+                  <span className="block text-[11px] font-bold text-[#252525]/70 mb-1.5">
+                    Ministérios com interesse em servir:
+                  </span>
+                  {(selectedMemberDetail.interestedMinistries || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMemberDetail.interestedMinistries!.map((m) => (
+                        <span
+                          key={m}
+                          className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1"
+                        >
+                          <Star className="w-3 h-3 text-amber-600 fill-amber-500" />
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#252525]/50 italic">
+                      Não indicou interesse em novos ministérios.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Núcleo Familiar */}
+            <div className="p-4 rounded-xl bg-white border border-[#252525]/15 space-y-2">
+              <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                Núcleo Familiar
+              </span>
+              {selectedMemberDetail.spouseName && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#252525]">
+                  <Heart className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                  <span>
+                    Cônjuge: <strong>{selectedMemberDetail.spouseName}</strong>
+                  </span>
+                </div>
+              )}
+              {selectedMemberDetail.dependents && selectedMemberDetail.dependents.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  <span className="block text-[11px] font-bold text-[#252525]/70">
+                    Filhos / Dependentes ({selectedMemberDetail.dependents.length}):
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedMemberDetail.dependents.map((dep, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-lg bg-[#F4F3EE] border border-[#252525]/10 flex items-center gap-2"
+                      >
+                        <Baby className="w-4 h-4 text-[#CB4B3B] shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <strong className="block text-xs truncate">
+                            {dep.fullName || (dep as any).name}
+                          </strong>
+                          <span className="text-[10px] text-[#252525]/60 block">
+                            {dep.relationship || "Filho(a)"}{" "}
+                            {dep.birthDate ? `• ${calculateAge(dep.birthDate)} anos` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                !selectedMemberDetail.spouseName && (
+                  <p className="text-xs text-[#252525]/50 italic">
+                    Nenhum familiar vinculado até o momento.
+                  </p>
+                )
+              )}
+            </div>
+
+            {/* Ações Administrativas (Exclusivo para Admin Master) */}
+            {session.isAdmin && (
+              <div className="p-4 rounded-2xl bg-[#252525] text-[#DCDACF] space-y-3">
+                <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                  Governança & Acessos Pastorais
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {!selectedMemberDetail.isPastor ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleSetMemberPastor(selectedMemberDetail, true, false);
+                        setSelectedMemberDetail(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-white text-xs font-black uppercase tracking-wider transition-colors shadow"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Nomear como Pastor</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleSetMemberPastor(
+                            selectedMemberDetail,
+                            true,
+                            !selectedMemberDetail.isAdmin
+                          );
+                          setSelectedMemberDetail(null);
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                          selectedMemberDetail.isAdmin
+                            ? "bg-white text-[#252525] hover:bg-[#DCDACF]"
+                            : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
+                        }`}
+                      >
+                        {selectedMemberDetail.isAdmin
+                          ? "Rebaixar para Pastor"
+                          : "👑 Tornar Admin Total"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleSetMemberPastor(selectedMemberDetail, false, false);
+                          setSelectedMemberDetail(null);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-red-950 text-red-300 hover:bg-red-900 text-xs font-bold transition-colors"
+                      >
+                        Remover Pastor
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedMemberDetail(null)}
+                className="px-5 py-2.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors"
+              >
+                Fechar Perfil
+              </button>
+            </div>
+          </div>
+        )}
       </LightDismissDialog>
 
       {/* Rodapé */}

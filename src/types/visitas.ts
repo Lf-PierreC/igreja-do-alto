@@ -125,6 +125,10 @@ export interface Member {
   spouseMemberId?: string; // ID do membro com quem tem vínculo de cônjuge
   dependents?: FamilyDependent[]; // Filhos e dependentes menores de 16 anos
 
+  // Ministérios da Igreja
+  currentMinistries?: string[]; // Ministérios em que a pessoa já serve atualmente
+  interestedMinistries?: string[]; // Ministérios/áreas em que a pessoa tem interesse em servir
+
   // Permissões pastorais e administrativas
   portalRole?: "membro" | "pastor" | "admin";
   isPastor?: boolean;

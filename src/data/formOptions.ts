@@ -186,3 +186,93 @@ export const REQUEST_TO_VISIT_REASON: Partial<
   "Novo na igreja": "Novo membro/frequentador",
   "Conhecer melhor a família": "Integração",
 };
+
+// ---------------------------------------------------------------------------
+// 3. Ministérios da Igreja do Alto (Atuação e Interesse)
+// ---------------------------------------------------------------------------
+
+export interface MinistryItem {
+  id: string;
+  label: string;
+  description?: string;
+  requiresAudition?: boolean;
+}
+
+export interface MinistryGroup {
+  category: string;
+  items: MinistryItem[];
+}
+
+export const CHURCH_MINISTRIES: MinistryGroup[] = [
+  {
+    category: "Cuidado, Acolhimento & Comunhão",
+    items: [
+      { id: "A Mais (Diaconia)", label: "A Mais (Diaconia)" },
+      { id: "Bem-vindo (Recepção)", label: "Bem-vindo (Recepção)" },
+      { id: "Integração", label: "Integração" },
+      { id: "Intercessão", label: "Intercessão" },
+      { id: "Amor do Alto (Ação Social)", label: "Amor do Alto (Ação Social)" },
+      { id: "Evangelismo", label: "Evangelismo" },
+    ],
+  },
+  {
+    category: "Gerações & Crianças",
+    items: [
+      { id: "Berçário", label: "Berçário" },
+      { id: "Ministério Infantil", label: "Ministério Infantil" },
+    ],
+  },
+  {
+    category: "Comunicação, Mídia & Artes",
+    items: [
+      { id: "Mídia – Iluminação", label: "Mídia – Iluminação" },
+      { id: "Mídia – Transmissão", label: "Mídia – Transmissão" },
+      { id: "Mídia – Câmeras", label: "Mídia – Câmeras" },
+      {
+        id: "Mídia – Stories / Redes Sociais",
+        label: "Mídia – Stories / Redes Sociais",
+      },
+      { id: "Mídia – Fotografia", label: "Mídia – Fotografia" },
+      { id: "Mídia – Vídeo", label: "Mídia – Vídeo" },
+      { id: "Comunicação / Design", label: "Comunicação / Design" },
+      { id: "Decoração", label: "Decoração" },
+      { id: "Eventos", label: "Eventos" },
+    ],
+  },
+  {
+    category: "Operações, Segurança & Estrutura",
+    items: [
+      { id: "Segurança", label: "Segurança" },
+      { id: "Manutenção / Zeladoria", label: "Manutenção / Zeladoria" },
+      {
+        id: "Equipe de Cuidado e Organização",
+        label: "Equipe de Cuidado e Organização",
+        description:
+          "Apoio nos mutirões de limpeza, organização e cuidado dos espaços da igreja",
+      },
+    ],
+  },
+  {
+    category: "Ministério de Louvor",
+    items: [
+      {
+        id: "Louvor – Vocal",
+        label: "Louvor – Vocal",
+        description: "Ministração vocal nos cultos e eventos",
+        requiresAudition: true,
+      },
+      {
+        id: "Louvor – Instrumental",
+        label: "Louvor – Instrumental",
+        description:
+          "Instrumentos musicais (teclado, violão, guitarra, baixo, bateria, etc.)",
+        requiresAudition: true,
+      },
+    ],
+  },
+];
+
+export const ALL_MINISTRY_IDS: string[] = CHURCH_MINISTRIES.flatMap((g) =>
+  g.items.map((i) => i.id)
+);
+

@@ -191,6 +191,8 @@ export async function POST(request: Request) {
         attendanceTime,
         participatesInActivity,
         activityName,
+        currentMinistries,
+        interestedMinistries,
       } = payload;
 
       const trimmedName = (name || "").trim();
@@ -293,6 +295,12 @@ export async function POST(request: Request) {
               : stub.participatesInActivity,
           activityName: activityName?.trim() || stub.activityName,
           address: address || stub.address,
+          currentMinistries: Array.isArray(currentMinistries)
+            ? currentMinistries
+            : stub.currentMinistries || [],
+          interestedMinistries: Array.isArray(interestedMinistries)
+            ? interestedMinistries
+            : stub.interestedMinistries || [],
           isOfficialMember: true,
           familyId: stub.familyId || familyId,
           familyRole: "titular",
@@ -324,6 +332,12 @@ export async function POST(request: Request) {
             neighborhood: "",
             city: "Mogi das Cruzes",
           },
+          currentMinistries: Array.isArray(currentMinistries)
+            ? currentMinistries
+            : [],
+          interestedMinistries: Array.isArray(interestedMinistries)
+            ? interestedMinistries
+            : [],
           registeredAt: todayISO(),
           lastVisitDate: null,
           situation: "bem",
@@ -564,6 +578,12 @@ export async function POST(request: Request) {
       if (updates.activityName !== undefined)
         member.activityName = updates.activityName?.trim() || undefined;
       if (updates.address) member.address = updates.address;
+      if (Array.isArray(updates.currentMinistries)) {
+        member.currentMinistries = updates.currentMinistries;
+      }
+      if (Array.isArray(updates.interestedMinistries)) {
+        member.interestedMinistries = updates.interestedMinistries;
+      }
       if (updates.password && updates.password.trim())
         member.password = updates.password.trim();
 
@@ -1083,6 +1103,8 @@ export async function POST(request: Request) {
         password,
         isPastor,
         isAdmin,
+        currentMinistries,
+        interestedMinistries,
       } = payload;
 
       const trimmedName = (name || "").trim();
@@ -1155,6 +1177,12 @@ export async function POST(request: Request) {
           neighborhood: "",
           city: "Mogi das Cruzes",
         },
+        currentMinistries: Array.isArray(currentMinistries)
+          ? currentMinistries
+          : [],
+        interestedMinistries: Array.isArray(interestedMinistries)
+          ? interestedMinistries
+          : [],
         registeredAt: todayISO(),
         lastVisitDate: null,
         situation: "bem",
@@ -1218,6 +1246,43 @@ export async function POST(request: Request) {
         member: newMember,
         allMembers: db.members,
         pastors: db.pastors,
+      });
+    }
+
+    // 11. ATUALIZAR MINISTÉRIOS DO MEMBRO (ATUANTES E INTERESSES)
+    if (action === "MEMBER_UPDATE_MINISTRIES") {
+      const { memberId, currentMinistries, interestedMinistries } = payload;
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      if (Array.isArray(currentMinistries)) {
+        member.currentMinistries = currentMinistries;
+      }
+      if (Array.isArray(interestedMinistries)) {
+        member.interestedMinistries = interestedMinistries;
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          await supabase
+            .from("members")
+            .upsert(mapMemberToRow(member), { onConflict: "id" });
+        } catch (supaErr) {
+          console.error("Erro ao atualizar ministérios no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        member,
+        allMembers: db.members,
       });
     }
 
