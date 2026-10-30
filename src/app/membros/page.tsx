@@ -129,8 +129,8 @@ export default function PortalDoMembroPage() {
 
   // Relacionamento com a Igreja (Cadastro)
   const [regRelationship, setRegRelationship] = useState<ChurchRelationship>("Membro");
-  const [regAttendanceTime, setRegAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
-  const [regParticipates, setRegParticipates] = useState<"Sim" | "Não">("Não");
+  const [regAttendanceTime, setRegAttendanceTime] = useState<AttendanceTime | "">("");
+  const [regParticipates, setRegParticipates] = useState<"Sim" | "Não">("");
   const [regActivityName, setRegActivityName] = useState("");
   const [regCurrentMinistries, setRegCurrentMinistries] = useState<string[]>([]);
 
