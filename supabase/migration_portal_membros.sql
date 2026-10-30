@@ -16,7 +16,12 @@ ALTER TABLE public.members
   ADD COLUMN IF NOT EXISTS family_id text,
   ADD COLUMN IF NOT EXISTS family_role text,
   ADD COLUMN IF NOT EXISTS spouse_member_id text,
-  ADD COLUMN IF NOT EXISTS dependents jsonb DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS dependents jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS is_pastor boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS portal_role text DEFAULT 'member',
+  ADD COLUMN IF NOT EXISTS current_ministries jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS interested_ministries jsonb DEFAULT '[]'::jsonb;
 
 -- 2. Cria índices únicos para garantir que não haja duplicidade de CPF ou E-mail
 CREATE UNIQUE INDEX IF NOT EXISTS idx_members_cpf_unique 
