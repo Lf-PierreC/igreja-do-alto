@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BrandLogo, MountainIcon } from "@/components/BrandLogo";
 import {
   Address,
+  AttendanceTime,
   ChurchRelationship,
   FamilyDependent,
   MaritalStatus,
@@ -16,11 +17,13 @@ import {
   WeekDay,
 } from "@/types/visitas";
 import {
+  ATTENDANCE_TIME,
   CHURCH_RELATIONSHIP,
   MARITAL_STATUS,
   REQUEST_REASONS,
   SHIFTS,
   WEEK_DAYS,
+  YES_NO,
 } from "@/data/formOptions";
 import {
   cleanDigits,
@@ -28,6 +31,8 @@ import {
   formatPhoneBR,
   validateCPF,
   calculateAge,
+  formatCEP,
+  fetchAddressByCEP,
 } from "@/lib/cpfUtils";
 import { formatAddress, formatDateBR, STATUS_META } from "@/lib/visitasUtils";
 import { LightDismissDialog } from "@/components/LightDismissDialog";
@@ -55,6 +60,9 @@ import {
   ChevronRight,
   Eye,
   Edit3,
+  Search,
+  UserX,
+  Church,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
@@ -80,13 +88,22 @@ export default function PortalDoMembroPage() {
   const [regBirthDate, setRegBirthDate] = useState("");
   const [regMaritalStatus, setRegMaritalStatus] = useState<MaritalStatus>("Casado(a)");
   const [regSpouseName, setRegSpouseName] = useState("");
+  const [regCep, setRegCep] = useState("");
   const [regStreet, setRegStreet] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [regComplement, setRegComplement] = useState("");
   const [regNeighborhood, setRegNeighborhood] = useState("");
   const [regCity, setRegCity] = useState("Mogi das Cruzes");
+  const [isSearchingCepReg, setIsSearchingCepReg] = useState(false);
+  const [cepErrorReg, setCepErrorReg] = useState<string | null>(null);
   const [regPassword, setRegPassword] = useState("");
   const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
+
+  // Relacionamento com a Igreja (Cadastro)
+  const [regRelationship, setRegRelationship] = useState<ChurchRelationship>("Membro");
+  const [regAttendanceTime, setRegAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
+  const [regParticipates, setRegParticipates] = useState<"Sim" | "Não">("Não");
+  const [regActivityName, setRegActivityName] = useState("");
 
   // Dados do Membro Logado
   const [memberData, setMemberData] = useState<Member | null>(null);
@@ -104,6 +121,7 @@ export default function PortalDoMembroPage() {
   // Vínculo de Cônjuge
   const [spouseIdentifier, setSpouseIdentifier] = useState("");
   const [isLinkingSpouse, setIsLinkingSpouse] = useState(false);
+  const [isUnlinkingSpouse, setIsUnlinkingSpouse] = useState(false);
   const [spouseLinkMessage, setSpouseLinkMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -146,13 +164,20 @@ export default function PortalDoMembroPage() {
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editMaritalStatus, setEditMaritalStatus] = useState<MaritalStatus>("Casado(a)");
   const [editSpouseName, setEditSpouseName] = useState("");
+  const [editCep, setEditCep] = useState("");
   const [editStreet, setEditStreet] = useState("");
   const [editNumber, setEditNumber] = useState("");
   const [editComplement, setEditComplement] = useState("");
   const [editNeighborhood, setEditNeighborhood] = useState("");
   const [editCity, setEditCity] = useState("Mogi das Cruzes");
+  const [isSearchingCepEdit, setIsSearchingCepEdit] = useState(false);
+  const [cepErrorEdit, setCepErrorEdit] = useState<string | null>(null);
   const [editPassword, setEditPassword] = useState("");
   const [editPasswordConfirm, setEditPasswordConfirm] = useState("");
+  const [editRelationship, setEditRelationship] = useState<ChurchRelationship>("Membro");
+  const [editAttendanceTime, setEditAttendanceTime] = useState<AttendanceTime | "">("");
+  const [editParticipates, setEditParticipates] = useState<"Sim" | "Não">("Não");
+  const [editActivityName, setEditActivityName] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -263,8 +288,13 @@ export default function PortalDoMembroPage() {
             phone: regPhone,
             birthDate: regBirthDate,
             maritalStatus: regMaritalStatus,
-            spouseName: regSpouseName,
+            spouseName: regMaritalStatus === "Casado(a)" ? regSpouseName.trim() : undefined,
+            relationship: regRelationship,
+            attendanceTime: regAttendanceTime || undefined,
+            participatesInActivity: regParticipates === "Sim",
+            activityName: regParticipates === "Sim" ? regActivityName.trim() : undefined,
             address: {
+              cep: regCep ? cleanDigits(regCep) : undefined,
               street: regStreet,
               number: regNumber,
               complement: regComplement || undefined,
@@ -483,6 +513,104 @@ export default function PortalDoMembroPage() {
     }
   };
 
+  const handleLookupCepReg = async (cepToSearch?: string) => {
+    const raw = cepToSearch || regCep;
+    const clean = cleanDigits(raw);
+    if (clean.length !== 8) {
+      setCepErrorReg("Digite os 8 números do CEP.");
+      return;
+    }
+    setCepErrorReg(null);
+    setIsSearchingCepReg(true);
+    try {
+      const result = await fetchAddressByCEP(clean);
+      if (!result) {
+        setCepErrorReg("CEP não encontrado. Preencha o endereço manualmente.");
+        return;
+      }
+      if (result.street) setRegStreet(result.street);
+      if (result.neighborhood) setRegNeighborhood(result.neighborhood);
+      if (result.city) setRegCity(result.city);
+      setTimeout(() => {
+        document.getElementById("reg-number")?.focus();
+      }, 100);
+    } catch {
+      setCepErrorReg("Erro ao consultar CEP.");
+    } finally {
+      setIsSearchingCepReg(false);
+    }
+  };
+
+  const handleLookupCepEdit = async (cepToSearch?: string) => {
+    const raw = cepToSearch || editCep;
+    const clean = cleanDigits(raw);
+    if (clean.length !== 8) {
+      setCepErrorEdit("Digite os 8 números do CEP.");
+      return;
+    }
+    setCepErrorEdit(null);
+    setIsSearchingCepEdit(true);
+    try {
+      const result = await fetchAddressByCEP(clean);
+      if (!result) {
+        setCepErrorEdit("CEP não encontrado. Preencha o endereço manualmente.");
+        return;
+      }
+      if (result.street) setEditStreet(result.street);
+      if (result.neighborhood) setEditNeighborhood(result.neighborhood);
+      if (result.city) setEditCity(result.city);
+      setTimeout(() => {
+        document.getElementById("edit-number")?.focus();
+      }, 100);
+    } catch {
+      setCepErrorEdit("Erro ao consultar CEP.");
+    } finally {
+      setIsSearchingCepEdit(false);
+    }
+  };
+
+  const handleUnlinkSpouse = async () => {
+    if (!session) return;
+    if (
+      !window.confirm(
+        "Deseja realmente desvincular o cônjuge do seu núcleo familiar? Ambos continuarão tendo seus acessos individuais normalmente."
+      )
+    ) {
+      return;
+    }
+    setIsUnlinkingSpouse(true);
+    setSpouseLinkMessage(null);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "FAMILY_UNLINK_SPOUSE",
+          payload: { memberId: session.id },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao desvincular cônjuge.");
+      }
+      setSpouseData(null);
+      if (data.member) {
+        setMemberData(data.member);
+      }
+      setSpouseLinkMessage({
+        type: "success",
+        text: "Cônjuge desvinculado com sucesso.",
+      });
+    } catch (err) {
+      setSpouseLinkMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao desvincular cônjuge.",
+      });
+    } finally {
+      setIsUnlinkingSpouse(false);
+    }
+  };
+
   const startEditingProfile = () => {
     if (!memberData) return;
     setEditName(memberData.name || "");
@@ -491,6 +619,7 @@ export default function PortalDoMembroPage() {
     setEditBirthDate(memberData.birthDate || "");
     setEditMaritalStatus((memberData.maritalStatus as MaritalStatus) || "Casado(a)");
     setEditSpouseName(memberData.spouseName || "");
+    setEditCep(memberData.address?.cep ? formatCEP(memberData.address.cep) : "");
     setEditStreet(memberData.address?.street || "");
     setEditNumber(memberData.address?.number || "");
     setEditComplement(memberData.address?.complement || "");
@@ -498,6 +627,10 @@ export default function PortalDoMembroPage() {
     setEditCity(memberData.address?.city || "Mogi das Cruzes");
     setEditPassword("");
     setEditPasswordConfirm("");
+    setEditRelationship(memberData.relationship || "Membro");
+    setEditAttendanceTime(memberData.attendanceTime || "");
+    setEditParticipates(memberData.participatesInActivity ? "Sim" : "Não");
+    setEditActivityName(memberData.activityName || "");
     setEditError(null);
     setEditSuccess(null);
     setIsEditingProfile(true);
@@ -546,7 +679,12 @@ export default function PortalDoMembroPage() {
               birthDate: editBirthDate || undefined,
               maritalStatus: editMaritalStatus,
               spouseName: editMaritalStatus === "Casado(a)" ? editSpouseName.trim() : "",
+              relationship: editRelationship,
+              attendanceTime: editAttendanceTime || undefined,
+              participatesInActivity: editParticipates === "Sim",
+              activityName: editParticipates === "Sim" ? editActivityName.trim() : undefined,
               address: {
+                cep: editCep ? cleanDigits(editCep) : undefined,
                 street: editStreet.trim(),
                 number: editNumber.trim(),
                 complement: editComplement.trim(),
@@ -889,11 +1027,54 @@ export default function PortalDoMembroPage() {
                   </div>
 
                   {/* Endereço Residencial */}
-                  <div className="pt-2 border-t border-[#252525]/15">
-                    <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B] mb-2">
+                  {/* Endereço Residencial com busca por CEP */}
+                  <div className="pt-2 border-t border-[#252525]/15 space-y-2">
+                    <span className="block text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
                       Endereço da Família
                     </span>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
+
+                    {/* Campo de CEP com busca */}
+                    <div>
+                      <label
+                        htmlFor="reg-cep"
+                        className="block text-[11px] font-bold text-[#252525]/80 mb-1"
+                      >
+                        Buscar Endereço por CEP
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          id="reg-cep"
+                          type="text"
+                          value={regCep}
+                          onChange={(e) => {
+                            const formatted = formatCEP(e.target.value);
+                            setRegCep(formatted);
+                            if (cleanDigits(formatted).length === 8) {
+                              handleLookupCepReg(formatted);
+                            }
+                          }}
+                          placeholder="00000-000"
+                          maxLength={9}
+                          className="w-40 rounded-xl border-2 border-[#252525]/25 bg-white px-3 py-2 text-xs font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleLookupCepReg(regCep)}
+                          disabled={isSearchingCepReg}
+                          className="px-4 py-2 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shrink-0"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          <span>{isSearchingCepReg ? "Buscando..." : "Buscar CEP"}</span>
+                        </button>
+                      </div>
+                      {cepErrorReg && (
+                        <p className="text-[11px] text-[#CB4B3B] font-bold mt-1">
+                          {cepErrorReg}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
                       <div className="col-span-2">
                         <input
                           type="text"
@@ -906,6 +1087,7 @@ export default function PortalDoMembroPage() {
                       </div>
                       <div>
                         <input
+                          id="reg-number"
                           type="text"
                           required
                           value={regNumber}
@@ -946,6 +1128,163 @@ export default function PortalDoMembroPage() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* SEÇÃO 2: RELACIONAMENTO COM A IGREJA */}
+                  <div className="pt-4 border-t-2 border-[#252525]/15 space-y-4">
+                    <div className="flex items-center gap-2.5 pb-2 border-b border-[#252525]/15">
+                      <span className="w-6 h-6 rounded-md bg-[#CB4B3B] text-white flex items-center justify-center font-black text-xs shrink-0">
+                        2
+                      </span>
+                      <h3 className="text-sm font-black uppercase tracking-wide text-[#252525]">
+                        Relacionamento com a Igreja
+                      </h3>
+                    </div>
+
+                    {/* Pergunta 1: Relação atual */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Qual é sua relação atual com a Igreja do Alto? *
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {CHURCH_RELATIONSHIP.map((rel) => {
+                          const isSelected = regRelationship === rel;
+                          return (
+                            <button
+                              key={rel}
+                              type="button"
+                              onClick={() => setRegRelationship(rel)}
+                              className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                  : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                  isSelected
+                                    ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                    : "border-[#252525]/40 bg-white"
+                                }`}
+                              >
+                                {isSelected && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                )}
+                              </div>
+                              <span
+                                className={`text-xs font-bold leading-tight ${
+                                  isSelected ? "text-[#252525]" : "text-[#252525]/85"
+                                }`}
+                              >
+                                {rel}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pergunta 2: Tempo de frequência */}
+                    <div className="space-y-2 pt-2">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Há quanto tempo frequenta a Igreja do Alto?
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {ATTENDANCE_TIME.map((time) => {
+                          const isSelected = regAttendanceTime === time;
+                          return (
+                            <button
+                              key={time}
+                              type="button"
+                              onClick={() => setRegAttendanceTime(time)}
+                              className={`flex items-center gap-2.5 p-2.5 rounded-2xl border-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                  : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                              }`}
+                            >
+                              <div
+                                className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                  isSelected
+                                    ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                    : "border-[#252525]/40 bg-white"
+                                }`}
+                              >
+                                {isSelected && (
+                                  <div className="w-1 h-1 rounded-full bg-white" />
+                                )}
+                              </div>
+                              <span
+                                className={`text-[11px] font-bold leading-tight ${
+                                  isSelected ? "text-[#252525]" : "text-[#252525]/80"
+                                }`}
+                              >
+                                {time}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pergunta 3: Participa de atividade */}
+                    <div className="space-y-2 pt-2">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Participa de alguma Casa do Alto, ministério ou atividade da igreja?
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 max-w-xs">
+                        {(["Sim", "Não"] as const).map((opt) => {
+                          const isSelected = regParticipates === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setRegParticipates(opt)}
+                              className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                  : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                  isSelected
+                                    ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                    : "border-[#252525]/40 bg-white"
+                                }`}
+                              >
+                                {isSelected && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                )}
+                              </div>
+                              <span
+                                className={`text-xs font-bold ${
+                                  isSelected ? "text-[#252525]" : "text-[#252525]/85"
+                                }`}
+                              >
+                                {opt}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pergunta 4 (condicional se Sim): Qual? */}
+                    {regParticipates === "Sim" && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                          Se sim: qual?
+                        </label>
+                        <input
+                          type="text"
+                          value={regActivityName}
+                          onChange={(e) => setRegActivityName(e.target.value)}
+                          placeholder="Informe qual Casa do Alto, ministério ou atividade participa"
+                          className="w-full rounded-2xl border-2 border-[#252525]/25 bg-white p-3 text-xs sm:text-sm font-semibold text-[#252525]"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Senha e Confirmação */}
@@ -1142,24 +1481,50 @@ export default function PortalDoMembroPage() {
               </div>
 
               {spouseData ? (
-                <div className="p-4 rounded-2xl bg-white border-2 border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-lg">
-                      {spouseData.name.charAt(0)}
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl bg-white border-2 border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-lg">
+                        {spouseData.name.charAt(0)}
+                      </div>
+                      <div>
+                        <strong className="block text-base font-black text-[#252525]">
+                          {spouseData.name}
+                        </strong>
+                        <span className="block text-xs font-semibold text-[#252525]/70">
+                          {spouseData.phone} {spouseData.email ? `• ${spouseData.email}` : ""}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <strong className="block text-base font-black text-[#252525]">
-                        {spouseData.name}
-                      </strong>
-                      <span className="block text-xs font-semibold text-[#252525]/70">
-                        {spouseData.phone} {spouseData.email ? `• ${spouseData.email}` : ""}
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-[#252525]/60 bg-[#F4F3EE] px-3 py-1.5 rounded-xl border border-[#252525]/10">
+                        Compartilha o mesmo lar e filhos
                       </span>
+                      <button
+                        type="button"
+                        onClick={handleUnlinkSpouse}
+                        disabled={isUnlinkingSpouse}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                        title="Desvincular cônjuge deste núcleo familiar"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        <span>{isUnlinkingSpouse ? "Desvinculando..." : "Desvincular Cônjuge"}</span>
+                      </button>
                     </div>
                   </div>
 
-                  <span className="text-xs font-bold text-[#252525]/60 bg-[#F4F3EE] px-3 py-1.5 rounded-xl border border-[#252525]/10">
-                    Compartilha o mesmo lar e filhos
-                  </span>
+                  {spouseLinkMessage && (
+                    <div
+                      className={`p-3 rounded-xl text-xs font-bold border ${
+                        spouseLinkMessage.type === "success"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+                      }`}
+                    >
+                      {spouseLinkMessage.text}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1714,62 +2079,109 @@ export default function PortalDoMembroPage() {
 
             {!isEditingProfile ? (
               /* MODO VISUALIZAÇÃO */
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    Nome Completo
-                  </span>
-                  <strong className="text-sm font-black">{memberData.name}</strong>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      Nome Completo
+                    </span>
+                    <strong className="text-sm font-black">{memberData.name}</strong>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      CPF (Chave Única)
+                    </span>
+                    <strong className="text-sm font-black">{formatCPF(memberData.cpf)}</strong>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      E-mail de Acesso
+                    </span>
+                    <strong className="text-sm font-black">{memberData.email || "Não informado"}</strong>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      Telefone / WhatsApp
+                    </span>
+                    <strong className="text-sm font-black">{memberData.phone}</strong>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      Data de Nascimento
+                    </span>
+                    <strong className="text-sm font-black">
+                      {formatDateBR(memberData.birthDate)}{" "}
+                      {calculateAge(memberData.birthDate)
+                        ? `(${calculateAge(memberData.birthDate)} anos)`
+                        : ""}
+                    </strong>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      Estado Civil
+                    </span>
+                    <strong className="text-sm font-black">
+                      {memberData.maritalStatus || "Não informado"}
+                      {memberData.spouseName ? ` • ${memberData.spouseName}` : ""}
+                    </strong>
+                  </div>
+
+                  <div className="sm:col-span-2 p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                    <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                      Endereço Residencial
+                    </span>
+                    <strong className="text-sm font-black">{formatAddress(memberData.address)}</strong>
+                  </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    CPF (Chave Única)
-                  </span>
-                  <strong className="text-sm font-black">{formatCPF(memberData.cpf)}</strong>
-                </div>
+                {/* Bloco de Relacionamento com a Igreja em Visualização */}
+                <div className="p-4 rounded-2xl bg-white border border-[#252525]/15 space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#252525]/10">
+                    <span className="w-5 h-5 rounded-md bg-[#CB4B3B] text-white flex items-center justify-center font-black text-[11px] shrink-0">
+                      2
+                    </span>
+                    <h3 className="text-xs font-black uppercase tracking-wide text-[#252525]">
+                      Relacionamento com a Igreja
+                    </h3>
+                  </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    E-mail de Acesso
-                  </span>
-                  <strong className="text-sm font-black">{memberData.email || "Não informado"}</strong>
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-semibold text-[#252525]">
+                    <div>
+                      <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                        Relação com a Igreja
+                      </span>
+                      <strong className="text-sm font-black text-[#CB4B3B]">
+                        {memberData.relationship || "Membro"}
+                      </strong>
+                    </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    Telefone / WhatsApp
-                  </span>
-                  <strong className="text-sm font-black">{memberData.phone}</strong>
-                </div>
+                    <div>
+                      <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                        Tempo de Frequência
+                      </span>
+                      <strong className="text-sm font-black">
+                        {memberData.attendanceTime || "Não informado"}
+                      </strong>
+                    </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    Data de Nascimento
-                  </span>
-                  <strong className="text-sm font-black">
-                    {formatDateBR(memberData.birthDate)}{" "}
-                    {calculateAge(memberData.birthDate)
-                      ? `(${calculateAge(memberData.birthDate)} anos)`
-                      : ""}
-                  </strong>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    Estado Civil
-                  </span>
-                  <strong className="text-sm font-black">
-                    {memberData.maritalStatus || "Não informado"}
-                    {memberData.spouseName ? ` • ${memberData.spouseName}` : ""}
-                  </strong>
-                </div>
-
-                <div className="sm:col-span-2 p-3.5 rounded-xl bg-white border border-[#252525]/10">
-                  <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                    Endereço Residencial
-                  </span>
-                  <strong className="text-sm font-black">{formatAddress(memberData.address)}</strong>
+                    <div className="sm:col-span-2">
+                      <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
+                        Casa do Alto, Ministério ou Atividade
+                      </span>
+                      <strong className="text-sm font-black">
+                        {memberData.participatesInActivity
+                          ? memberData.activityName
+                            ? `Sim • ${memberData.activityName}`
+                            : "Sim"
+                          : "Não participa"}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1897,6 +2309,47 @@ export default function PortalDoMembroPage() {
                     Endereço Residencial
                   </span>
 
+                  {/* Campo de CEP com busca */}
+                  <div>
+                    <label
+                      htmlFor="edit-cep"
+                      className="block text-[11px] font-bold text-[#252525]/80 mb-1"
+                    >
+                      Buscar Endereço por CEP
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="edit-cep"
+                        type="text"
+                        value={editCep}
+                        onChange={(e) => {
+                          const formatted = formatCEP(e.target.value);
+                          setEditCep(formatted);
+                          if (cleanDigits(formatted).length === 8) {
+                            handleLookupCepEdit(formatted);
+                          }
+                        }}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        className="w-40 rounded-xl border-2 border-[#252525]/25 bg-white p-2.5 text-xs font-semibold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleLookupCepEdit(editCep)}
+                        disabled={isSearchingCepEdit}
+                        className="px-4 py-2 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shrink-0"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        <span>{isSearchingCepEdit ? "Buscando..." : "Buscar CEP"}</span>
+                      </button>
+                    </div>
+                    {cepErrorEdit && (
+                      <p className="text-[11px] text-[#CB4B3B] font-bold mt-1">
+                        {cepErrorEdit}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
                       <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
@@ -1915,6 +2368,7 @@ export default function PortalDoMembroPage() {
                         Número
                       </label>
                       <input
+                        id="edit-number"
                         type="text"
                         value={editNumber}
                         onChange={(e) => setEditNumber(e.target.value)}
@@ -1962,6 +2416,163 @@ export default function PortalDoMembroPage() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* SEÇÃO 2: RELACIONAMENTO COM A IGREJA */}
+                <div className="pt-4 border-t-2 border-[#252525]/15 space-y-4">
+                  <div className="flex items-center gap-2.5 pb-2 border-b border-[#252525]/15">
+                    <span className="w-6 h-6 rounded-md bg-[#CB4B3B] text-white flex items-center justify-center font-black text-xs shrink-0">
+                      2
+                    </span>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-[#252525]">
+                      Relacionamento com a Igreja
+                    </h3>
+                  </div>
+
+                  {/* Pergunta 1: Relação atual */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                      Qual é sua relação atual com a Igreja do Alto? *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {CHURCH_RELATIONSHIP.map((rel) => {
+                        const isSelected = editRelationship === rel;
+                        return (
+                          <button
+                            key={rel}
+                            type="button"
+                            onClick={() => setEditRelationship(rel)}
+                            className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                              isSelected
+                                ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                            }`}
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                  : "border-[#252525]/40 bg-white"
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              )}
+                            </div>
+                            <span
+                              className={`text-xs font-bold leading-tight ${
+                                isSelected ? "text-[#252525]" : "text-[#252525]/85"
+                              }`}
+                            >
+                              {rel}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Pergunta 2: Tempo de frequência */}
+                  <div className="space-y-2 pt-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                      Há quanto tempo frequenta a Igreja do Alto?
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {ATTENDANCE_TIME.map((time) => {
+                        const isSelected = editAttendanceTime === time;
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            onClick={() => setEditAttendanceTime(time)}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-2xl border-2 text-left transition-all ${
+                              isSelected
+                                ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                            }`}
+                          >
+                            <div
+                              className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                  : "border-[#252525]/40 bg-white"
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="w-1 h-1 rounded-full bg-white" />
+                              )}
+                            </div>
+                            <span
+                              className={`text-[11px] font-bold leading-tight ${
+                                isSelected ? "text-[#252525]" : "text-[#252525]/80"
+                              }`}
+                            >
+                              {time}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Pergunta 3: Participa de atividade */}
+                  <div className="space-y-2 pt-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                      Participa de alguma Casa do Alto, ministério ou atividade da igreja?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 max-w-xs">
+                      {(["Sim", "Não"] as const).map((opt) => {
+                        const isSelected = editParticipates === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setEditParticipates(opt)}
+                            className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                              isSelected
+                                ? "border-[#CB4B3B] bg-white shadow-sm ring-1 ring-[#CB4B3B]"
+                                : "border-[#252525]/20 bg-white/70 hover:bg-white hover:border-[#252525]/40"
+                            }`}
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "border-[#CB4B3B] bg-[#CB4B3B]"
+                                  : "border-[#252525]/40 bg-white"
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              )}
+                            </div>
+                            <span
+                              className={`text-xs font-bold ${
+                                isSelected ? "text-[#252525]" : "text-[#252525]/85"
+                              }`}
+                            >
+                              {opt}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Pergunta 4 (condicional se Sim): Qual? */}
+                  {editParticipates === "Sim" && (
+                    <div className="space-y-1.5 pt-1">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Se sim: qual?
+                      </label>
+                      <input
+                        type="text"
+                        value={editActivityName}
+                        onChange={(e) => setEditActivityName(e.target.value)}
+                        placeholder="Informe qual Casa do Alto, ministério ou atividade participa"
+                        className="w-full rounded-2xl border-2 border-[#252525]/25 bg-white p-3 text-xs sm:text-sm font-semibold text-[#252525]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* SEGURANÇA / ALTERAR SENHA */}

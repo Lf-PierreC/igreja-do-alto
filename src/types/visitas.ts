@@ -44,6 +44,7 @@ export type NewVisitTimeframe = (typeof NEW_VISIT_TIMEFRAMES)[number];
 export type RequestStatus = "pendente" | "agendada" | "realizada" | "cancelada";
 
 export interface Address {
+  cep?: string;
   street: string;
   number: string;
   complement?: string;

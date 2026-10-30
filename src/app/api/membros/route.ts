@@ -124,6 +124,10 @@ export async function POST(request: Request) {
         spouseName,
         address,
         password,
+        relationship,
+        attendanceTime,
+        participatesInActivity,
+        activityName,
       } = payload;
 
       const trimmedName = (name || "").trim();
@@ -218,6 +222,13 @@ export async function POST(request: Request) {
           birthDate: birthDate || stub.birthDate,
           maritalStatus: maritalStatus || stub.maritalStatus,
           spouseName: spouseName?.trim() || stub.spouseName,
+          relationship: relationship || stub.relationship || "Membro",
+          attendanceTime: attendanceTime || stub.attendanceTime,
+          participatesInActivity:
+            typeof participatesInActivity === "boolean"
+              ? participatesInActivity
+              : stub.participatesInActivity,
+          activityName: activityName?.trim() || stub.activityName,
           address: address || stub.address,
           isOfficialMember: true,
           familyId: stub.familyId || familyId,
@@ -237,12 +248,18 @@ export async function POST(request: Request) {
           birthDate: birthDate || undefined,
           maritalStatus: maritalStatus || "Solteiro(a)",
           spouseName: spouseName?.trim() || undefined,
-          relationship: "Membro",
+          relationship: relationship || "Membro",
+          attendanceTime: attendanceTime || undefined,
+          participatesInActivity:
+            typeof participatesInActivity === "boolean"
+              ? participatesInActivity
+              : undefined,
+          activityName: activityName?.trim() || undefined,
           address: address || {
             street: "",
             number: "",
             neighborhood: "",
-            city: "São Paulo",
+            city: "Mogi das Cruzes",
           },
           registeredAt: todayISO(),
           lastVisitDate: null,
@@ -354,6 +371,13 @@ export async function POST(request: Request) {
       if (updates.maritalStatus) member.maritalStatus = updates.maritalStatus;
       if (updates.spouseName !== undefined)
         member.spouseName = updates.spouseName.trim();
+      if (updates.relationship) member.relationship = updates.relationship;
+      if (updates.attendanceTime !== undefined)
+        member.attendanceTime = updates.attendanceTime || undefined;
+      if (updates.participatesInActivity !== undefined)
+        member.participatesInActivity = updates.participatesInActivity;
+      if (updates.activityName !== undefined)
+        member.activityName = updates.activityName?.trim() || undefined;
       if (updates.address) member.address = updates.address;
       if (updates.password && updates.password.trim())
         member.password = updates.password.trim();
@@ -471,6 +495,51 @@ export async function POST(request: Request) {
           email: spouse.email,
         },
         dependents: mergedDependents,
+      });
+    }
+
+    // 4.1. DESVINCULAR CÔNJUGE
+    if (action === "FAMILY_UNLINK_SPOUSE") {
+      const { memberId } = payload;
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro titular não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      let spouse: Member | null = null;
+      if (member.spouseMemberId) {
+        spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
+      }
+
+      if (spouse) {
+        spouse.spouseMemberId = undefined;
+        spouse.spouseName = undefined;
+        spouse.familyId = `fam-${Date.now()}`;
+      }
+
+      member.spouseMemberId = undefined;
+      member.spouseName = undefined;
+      member.familyId = `fam-${Date.now() + 1}`;
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          const toUpsert = [mapMemberToRow(member)];
+          if (spouse) toUpsert.push(mapMemberToRow(spouse));
+          await supabase.from("members").upsert(toUpsert, { onConflict: "id" });
+        } catch (supaErr) {
+          console.error("Erro ao desvincular cônjuge no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        member,
+        spouse: null,
       });
     }
 

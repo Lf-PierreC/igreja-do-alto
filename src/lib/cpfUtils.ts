@@ -84,3 +84,42 @@ export function calculateAge(birthDate?: string | null): number | null {
   }
   return age >= 0 ? age : null;
 }
+
+/**
+ * Formata uma string de até 8 dígitos no padrão de CEP: 00000-000
+ */
+export function formatCEP(value?: string | null): string {
+  const digits = cleanDigits(value).slice(0, 8);
+  if (!digits) return "";
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5, 8)}`;
+}
+
+export interface ViaCepResult {
+  street: string;
+  neighborhood: string;
+  city: string;
+  state?: string;
+}
+
+/**
+ * Consulta CEP na API pública do ViaCEP
+ */
+export async function fetchAddressByCEP(rawCep: string): Promise<ViaCepResult | null> {
+  const clean = cleanDigits(rawCep);
+  if (clean.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.erro) return null;
+    return {
+      street: data.logradouro || "",
+      neighborhood: data.bairro || "",
+      city: data.localidade || "",
+      state: data.uf || "",
+    };
+  } catch {
+    return null;
+  }
+}
