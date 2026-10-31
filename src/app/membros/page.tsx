@@ -291,8 +291,8 @@ export default function PortalDoMembroPage() {
   const [isSearchingCepAddMem, setIsSearchingCepAddMem] = useState(false);
   const [cepErrorAddMem, setCepErrorAddMem] = useState<string | null>(null);
   const [addMemRelationship, setAddMemRelationship] = useState<ChurchRelationship>("Membro");
-  const [addMemAttendanceTime, setAddMemAttendanceTime] = useState<AttendanceTime | "">("Mais de 5 anos");
-  const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não">("Não");
+  const [addMemAttendanceTime, setAddMemAttendanceTime] = useState<AttendanceTime | "">("");
+  const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não">("");
   const [addMemActivityName, setAddMemActivityName] = useState("");
   const [addMemCurrentMinistries, setAddMemCurrentMinistries] = useState<string[]>([]);
   const [addMemPassword, setAddMemPassword] = useState("igrejadoalto");
