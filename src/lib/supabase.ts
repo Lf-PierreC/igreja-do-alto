@@ -70,6 +70,12 @@ export function mapRowToPastor(row: Record<string, any>): PastorLeader {
   const accessRole = rawAccessRole === "admin" ? "admin" : "pastor";
   const cleanRegion = rawRegion.replace(PASTOR_AUTH_REGEX, "").trim() || "Igreja do Alto";
 
+  const memberId =
+    row.member_id ||
+    (typeof row.id === "string" && row.id.startsWith("pas-")
+      ? row.id.replace(/^pas-/, "")
+      : undefined);
+
   return {
     id: row.id,
     name: row.name,
@@ -79,6 +85,7 @@ export function mapRowToPastor(row: Record<string, any>): PastorLeader {
     username,
     password,
     accessRole,
+    memberId,
   };
 }
 
@@ -152,24 +159,27 @@ export function mapRowToMember(row: Record<string, any>): Member {
     familyId: row.family_id || portalData.familyId || undefined,
     familyRole: row.family_role || portalData.familyRole || undefined,
     spouseMemberId: row.spouse_member_id || portalData.spouseMemberId || undefined,
-    dependents: Array.isArray(row.dependents)
-      ? row.dependents
-      : Array.isArray(portalData.dependents)
-      ? portalData.dependents
-      : [],
+    dependents:
+      Array.isArray(row.dependents) && row.dependents.length > 0
+        ? row.dependents
+        : Array.isArray(portalData.dependents)
+        ? portalData.dependents
+        : [],
     portalRole: row.portal_role || portalData.portalRole || undefined,
     isPastor: row.is_pastor ?? portalData.isPastor ?? false,
     isAdmin: row.is_admin ?? portalData.isAdmin ?? false,
-    currentMinistries: Array.isArray(row.current_ministries)
-      ? row.current_ministries
-      : Array.isArray(portalData.currentMinistries)
-      ? portalData.currentMinistries
-      : [],
-    interestedMinistries: Array.isArray(row.interested_ministries)
-      ? row.interested_ministries
-      : Array.isArray(portalData.interestedMinistries)
-      ? portalData.interestedMinistries
-      : [],
+    currentMinistries:
+      Array.isArray(row.current_ministries) && row.current_ministries.length > 0
+        ? row.current_ministries
+        : Array.isArray(portalData.currentMinistries)
+        ? portalData.currentMinistries
+        : [],
+    interestedMinistries:
+      Array.isArray(row.interested_ministries) && row.interested_ministries.length > 0
+        ? row.interested_ministries
+        : Array.isArray(portalData.interestedMinistries)
+        ? portalData.interestedMinistries
+        : [],
   };
 }
 
@@ -237,6 +247,20 @@ export function mapMemberToRow(m: Member) {
     follow_up_responsible: m.followUpResponsible ?? null,
     leadership_alert: m.leadershipAlert ?? null,
     notes: finalNotes,
+    // Colunas diretas do Portal do Membro & Núcleo Familiar
+    cpf: m.cpf ?? null,
+    email: m.email ?? null,
+    password: m.password ?? null,
+    is_official_member: m.isOfficialMember ?? false,
+    family_id: m.familyId ?? null,
+    family_role: m.familyRole ?? null,
+    spouse_member_id: m.spouseMemberId ?? null,
+    dependents: m.dependents ?? [],
+    is_pastor: m.isPastor ?? false,
+    is_admin: m.isAdmin ?? false,
+    portal_role: m.portalRole ?? null,
+    current_ministries: m.currentMinistries ?? [],
+    interested_ministries: m.interestedMinistries ?? [],
     updated_at: new Date().toISOString(),
   };
 }

@@ -84,6 +84,7 @@ import {
   Music,
   Award,
   MessageCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
@@ -130,7 +131,7 @@ export default function PortalDoMembroPage() {
   // Relacionamento com a Igreja (Cadastro)
   const [regRelationship, setRegRelationship] = useState<ChurchRelationship>("Membro");
   const [regAttendanceTime, setRegAttendanceTime] = useState<AttendanceTime | "">("");
-  const [regParticipates, setRegParticipates] = useState<"Sim" | "Não">("");
+  const [regParticipates, setRegParticipates] = useState<"Sim" | "Não" | "">("");
   const [regActivityName, setRegActivityName] = useState("");
   const [regCurrentMinistries, setRegCurrentMinistries] = useState<string[]>([]);
 
@@ -243,6 +244,34 @@ export default function PortalDoMembroPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Modais customizados estilizados (substituem window.confirm e alert)
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    subtitle?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    type?: "info" | "warning" | "success" | "error";
+  }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   // Modal: Cadastrar Novo Membro (Admin ou Pastor)
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
@@ -397,14 +426,34 @@ export default function PortalDoMembroPage() {
       if (data.allMembers) {
         setAllMembers(data.allMembers);
       }
+      const successText =
+        myInterestedMinistries.length > 0
+          ? `Que bênção! Seu interesse em servir em ${myInterestedMinistries.length} área(s) foi registrado com sucesso. Nossa liderança entrará em contato com você com muito carinho!`
+          : "Suas preferências ministeriais foram atualizadas com sucesso.";
+
       setMinistryFeedback({
         type: "success",
-        text: "Que bênção! Seu interesse em servir foi registrado com sucesso. Nossa liderança entrará em contato com muito carinho!",
+        text: successText,
+      });
+
+      setAlertModal({
+        open: true,
+        title: "Interesse Registrado!",
+        message: successText,
+        type: "success",
       });
     } catch (err) {
+      const errorText =
+        err instanceof Error ? err.message : "Erro ao salvar preferências ministeriais.";
       setMinistryFeedback({
         type: "error",
-        text: err instanceof Error ? err.message : "Erro ao salvar preferências ministeriais.",
+        text: errorText,
+      });
+      setAlertModal({
+        open: true,
+        title: "Atenção",
+        message: errorText,
+        type: "error",
       });
     } finally {
       setIsSavingMinistries(false);
@@ -595,32 +644,39 @@ export default function PortalDoMembroPage() {
     }
   };
 
-  const handleRemoveDependent = async (depId: string, depName: string) => {
+  const handleRemoveDependent = (depId: string, depName: string) => {
     if (!session) return;
-    if (!window.confirm(`Deseja realmente remover ${depName} da sua lista de filhos/dependentes?`)) {
-      return;
-    }
+    setConfirmModal({
+      open: true,
+      title: "Remover Dependente",
+      subtitle: "Núcleo Familiar",
+      message: `Deseja realmente remover "${depName}" da sua lista de filhos/dependentes?`,
+      confirmText: "Sim, Remover",
+      cancelText: "Cancelar",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/membros", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "FAMILY_REMOVE_DEPENDENT",
+              payload: {
+                memberId: session.id,
+                dependentId: depId,
+              },
+            }),
+          });
 
-    try {
-      const res = await fetch("/api/membros", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "FAMILY_REMOVE_DEPENDENT",
-          payload: {
-            memberId: session.id,
-            dependentId: depId,
-          },
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.dependents) {
-        setDependents(data.dependents);
-      }
-    } catch (err) {
-      console.error("Erro ao remover dependente:", err);
-    }
+          const data = await res.json();
+          if (res.ok && data.dependents) {
+            setDependents(data.dependents);
+          }
+        } catch (err) {
+          console.error("Erro ao remover dependente:", err);
+        }
+      },
+    });
   };
 
   const handleCreateVisitRequest = async (e: React.FormEvent) => {
@@ -732,46 +788,51 @@ export default function PortalDoMembroPage() {
     }
   };
 
-  const handleUnlinkSpouse = async () => {
+  const handleUnlinkSpouse = () => {
     if (!session) return;
-    if (
-      !window.confirm(
-        "Deseja realmente desvincular o cônjuge do seu núcleo familiar? Ambos continuarão tendo seus acessos individuais normalmente."
-      )
-    ) {
-      return;
-    }
-    setIsUnlinkingSpouse(true);
-    setSpouseLinkMessage(null);
-    try {
-      const res = await fetch("/api/membros", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "FAMILY_UNLINK_SPOUSE",
-          payload: { memberId: session.id },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao desvincular cônjuge.");
-      }
-      setSpouseData(null);
-      if (data.member) {
-        setMemberData(data.member);
-      }
-      setSpouseLinkMessage({
-        type: "success",
-        text: "Cônjuge desvinculado com sucesso.",
-      });
-    } catch (err) {
-      setSpouseLinkMessage({
-        type: "error",
-        text: err instanceof Error ? err.message : "Erro ao desvincular cônjuge.",
-      });
-    } finally {
-      setIsUnlinkingSpouse(false);
-    }
+    setConfirmModal({
+      open: true,
+      title: "Desvincular Cônjuge",
+      subtitle: "Núcleo Familiar",
+      message:
+        "Deseja realmente desvincular o cônjuge do seu núcleo familiar? Ambos continuarão tendo seus acessos individuais normalmente.",
+      confirmText: "Sim, Desvincular",
+      cancelText: "Cancelar",
+      isDestructive: true,
+      onConfirm: async () => {
+        setIsUnlinkingSpouse(true);
+        setSpouseLinkMessage(null);
+        try {
+          const res = await fetch("/api/membros", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "FAMILY_UNLINK_SPOUSE",
+              payload: { memberId: session.id },
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Erro ao desvincular cônjuge.");
+          }
+          setSpouseData(null);
+          if (data.member) {
+            setMemberData(data.member);
+          }
+          setSpouseLinkMessage({
+            type: "success",
+            text: "Cônjuge desvinculado com sucesso.",
+          });
+        } catch (err) {
+          setSpouseLinkMessage({
+            type: "error",
+            text: err instanceof Error ? err.message : "Erro ao desvincular cônjuge.",
+          });
+        } finally {
+          setIsUnlinkingSpouse(false);
+        }
+      },
+    });
   };
 
   const startEditingProfile = () => {
@@ -996,7 +1057,7 @@ export default function PortalDoMembroPage() {
     }
   };
 
-  const handleSetMemberPastor = async (
+  const handleSetMemberPastor = (
     targetMember: Member,
     willBePastor: boolean,
     willBeAdmin?: boolean
@@ -1005,39 +1066,50 @@ export default function PortalDoMembroPage() {
     const confirmMsg = willBePastor
       ? `Deseja nomear "${targetMember.name}" como Pastor da Igreja?`
       : `Deseja remover a função pastoral de "${targetMember.name}"?`;
-    if (!window.confirm(confirmMsg)) return;
 
-    try {
-      const res = await fetch("/api/membros", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "ADMIN_SET_MEMBER_PASTOR",
-          payload: {
-            memberId: targetMember.id,
-            isPastor: willBePastor,
-            isAdmin: Boolean(willBeAdmin),
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao atualizar permissão pastoral.");
-      }
-      if (data.allMembers) setAllMembers(data.allMembers);
-      if (data.pastors) setPastorsList(data.pastors);
-      setAdminFeedback({
-        type: "success",
-        text: willBePastor
-          ? `"${targetMember.name}" agora é Pastor da Igreja!`
-          : `Função pastoral removida de "${targetMember.name}".`,
-      });
-    } catch (err) {
-      setAdminFeedback({
-        type: "error",
-        text: err instanceof Error ? err.message : "Erro ao alterar permissão.",
-      });
-    }
+    setConfirmModal({
+      open: true,
+      title: willBePastor ? "Nomear Pastor da Igreja" : "Remover Função Pastoral",
+      subtitle: "Gestão do Corpo Pastoral",
+      message: confirmMsg,
+      confirmText: willBePastor ? "Sim, Nomear Pastor" : "Sim, Remover Função",
+      cancelText: "Cancelar",
+      isDestructive: !willBePastor,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/membros", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "ADMIN_SET_MEMBER_PASTOR",
+              payload: {
+                memberId: targetMember.id,
+                pastorName: targetMember.name,
+                isPastor: willBePastor,
+                isAdmin: Boolean(willBeAdmin),
+              },
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Erro ao atualizar permissão pastoral.");
+          }
+          if (data.allMembers) setAllMembers(data.allMembers);
+          if (data.pastors) setPastorsList(data.pastors);
+          setAdminFeedback({
+            type: "success",
+            text: willBePastor
+              ? `"${targetMember.name}" agora é Pastor da Igreja!`
+              : `Função pastoral removida de "${targetMember.name}".`,
+          });
+        } catch (err) {
+          setAdminFeedback({
+            type: "error",
+            text: err instanceof Error ? err.message : "Erro ao alterar permissão.",
+          });
+        }
+      },
+    });
   };
 
   const handleTogglePastorAccess = async (pastor: PastorLeader) => {
@@ -1074,19 +1146,69 @@ export default function PortalDoMembroPage() {
     }
   };
 
-  const handleDemotePastor = async (pastor: PastorLeader) => {
-    if (!window.confirm(`Deseja remover a função pastoral de "${pastor.name}"?`))
-      return;
-    const targetMember = allMembers.find(
-      (m) =>
-        m.id === pastor.memberId ||
-        m.name.toLowerCase() === pastor.name.toLowerCase()
-    );
-    if (!targetMember) {
-      alert("Membro correspondente não localizado.");
+  const handleDemotePastor = (pastor: PastorLeader) => {
+    if (
+      session &&
+      (session.id === pastor.memberId ||
+        (pastor.id.startsWith("pas-") && pastor.id === `pas-${session.id}`) ||
+        session.name.toLowerCase() === pastor.name.toLowerCase())
+    ) {
+      setAlertModal({
+        open: true,
+        title: "Ação Não Permitida",
+        message:
+          "Você não pode remover seu próprio acesso administrativo/pastoral por motivos de segurança.",
+        type: "warning",
+      });
       return;
     }
-    await handleSetMemberPastor(targetMember, false, false);
+
+    setConfirmModal({
+      open: true,
+      title: "Remover Função Pastoral",
+      subtitle: "Gestão do Corpo Pastoral",
+      message: `Deseja realmente remover a função pastoral de "${pastor.name}"? A pessoa voltará a ter acesso comum como membro.`,
+      confirmText: "Sim, Remover Pastor",
+      cancelText: "Cancelar",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/membros", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "ADMIN_SET_MEMBER_PASTOR",
+              payload: {
+                pastorId: pastor.id,
+                memberId:
+                  pastor.memberId ||
+                  (pastor.id.startsWith("pas-")
+                    ? pastor.id.replace(/^pas-/, "")
+                    : undefined),
+                pastorName: pastor.name,
+                isPastor: false,
+                isAdmin: false,
+              },
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Erro ao remover função pastoral.");
+          }
+          if (data.pastors) setPastorsList(data.pastors);
+          if (data.allMembers) setAllMembers(data.allMembers);
+          setAdminFeedback({
+            type: "success",
+            text: `Função pastoral removida com sucesso de "${pastor.name}".`,
+          });
+        } catch (err) {
+          setAdminFeedback({
+            type: "error",
+            text: err instanceof Error ? err.message : "Erro ao remover pastor.",
+          });
+        }
+      },
+    });
   };
 
   const handleQuickAppointPastor = async (e: React.FormEvent) => {
@@ -1110,7 +1232,13 @@ export default function PortalDoMembroPage() {
     }
 
     if (!target) {
-      alert("Por favor, selecione ou digite o nome de um membro cadastrado.");
+      setAlertModal({
+        open: true,
+        title: "Membro Não Selecionado",
+        message:
+          "Por favor, selecione ou digite o nome de um membro cadastrado na plataforma para nomear como pastor.",
+        type: "warning",
+      });
       return;
     }
 
@@ -2121,7 +2249,7 @@ export default function PortalDoMembroPage() {
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : memberData?.maritalStatus === "Casado(a)" ? (
                 <div className="space-y-3">
                   <p className="text-xs sm:text-sm text-[#252525]/80 font-medium leading-relaxed">
                     Vincule o cadastro do seu esposo(a) digitando o <strong>CPF</strong> ou <strong>E-mail</strong> dele(a). Ao vincular, vocês compartilharão o mesmo núcleo familiar e a lista de filhos no cuidado pastoral.
@@ -2156,6 +2284,29 @@ export default function PortalDoMembroPage() {
                       {spouseLinkMessage.text}
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-white/70 border border-[#252525]/15 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#252525]/80">
+                    <Heart className="w-4 h-4 text-[#CB4B3B]" />
+                    <span>
+                      Estado civil registrado: <strong>{memberData?.maritalStatus || "Solteiro(a)"}</strong>
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#252525]/70 leading-relaxed">
+                    A vinculação de cônjuge está disponível exclusivamente para membros com estado civil <strong>Casado(a)</strong>. Caso tenha se casado ou precise atualizar o seu cadastro, você pode alterar seu estado civil na aba <strong>Meu Cadastro</strong>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("meu-cadastro");
+                      startEditingProfile();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold transition-colors mt-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Atualizar Meu Estado Civil</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -4111,6 +4262,33 @@ export default function PortalDoMembroPage() {
                     })}
                   </div>
 
+                  {/* Feedback de Confirmação Visível logo acima do Botão */}
+                  {ministryFeedback && (
+                    <div
+                      className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${
+                        ministryFeedback.type === "success"
+                          ? "bg-emerald-950 text-[#DCDACF] border-emerald-600"
+                          : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {ministryFeedback.type === "success" ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-[#CB4B3B] shrink-0" />
+                        )}
+                        <span>{ministryFeedback.text}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMinistryFeedback(null)}
+                        className="opacity-70 hover:opacity-100"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="pt-5 border-t border-[#252525]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <span className="text-xs font-semibold text-[#252525]/75 text-center sm:text-left">
                       Ao salvar, seus dados e interesses são registrados com segurança para os pastores e líderes ministeriais da igreja.
@@ -5233,6 +5411,98 @@ export default function PortalDoMembroPage() {
             </div>
           </div>
         )}
+      </LightDismissDialog>
+
+      {/* MODAL DE CONFIRMAÇÃO ESTILIZADO (Substitui window.confirm) */}
+      <LightDismissDialog
+        open={confirmModal.open}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+        title={confirmModal.title}
+        subtitle={confirmModal.subtitle}
+        maxWidthClass="max-w-md"
+      >
+        <div className="space-y-5 text-sm p-1">
+          <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
+            {confirmModal.isDestructive ? (
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-[#252525] text-[#DCDACF] flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5 text-[#CB4B3B]" />
+              </div>
+            )}
+            <p className="text-xs sm:text-sm text-[#252525] font-semibold leading-relaxed">
+              {confirmModal.message}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#252525]/10">
+            <button
+              type="button"
+              onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+              className="px-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white hover:bg-gray-100 text-[#252525] text-xs font-bold transition-colors"
+            >
+              {confirmModal.cancelText || "Cancelar"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const action = confirmModal.onConfirm;
+                setConfirmModal((prev) => ({ ...prev, open: false }));
+                await action();
+              }}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow ${
+                confirmModal.isDestructive
+                  ? "bg-[#CB4B3B] hover:bg-[#A93829] text-white"
+                  : "bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF]"
+              }`}
+            >
+              {confirmModal.confirmText || "Confirmar"}
+            </button>
+          </div>
+        </div>
+      </LightDismissDialog>
+
+      {/* MODAL DE ALERTA / AVISO ESTILIZADO (Substitui window.alert) */}
+      <LightDismissDialog
+        open={alertModal.open}
+        onClose={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+        title={alertModal.title}
+        maxWidthClass="max-w-md"
+      >
+        <div className="space-y-5 text-sm p-1">
+          <div
+            className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 ${
+              alertModal.type === "success"
+                ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                : alertModal.type === "error"
+                ? "bg-red-50 border-red-300 text-red-950"
+                : "bg-amber-50 border-amber-300 text-amber-950"
+            }`}
+          >
+            {alertModal.type === "success" ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : alertModal.type === "error" ? (
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <p className="text-xs sm:text-sm font-semibold leading-relaxed">
+              {alertModal.message}
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-[#252525]/10">
+            <button
+              type="button"
+              onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+              className="px-6 py-2.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
       </LightDismissDialog>
 
       {/* Rodapé */}

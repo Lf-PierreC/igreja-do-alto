@@ -939,49 +939,63 @@ export async function POST(request: Request) {
 
     // 8. ADMIN: DEFINIR / REMOVER MEMBRO COMO PASTOR
     if (action === "ADMIN_SET_MEMBER_PASTOR") {
-      const { memberId, isPastor, isAdmin } = payload as {
-        memberId: string;
+      const { memberId, pastorId, pastorName, isPastor, isAdmin } = payload as {
+        memberId?: string;
+        pastorId?: string;
+        pastorName?: string;
         isPastor: boolean;
         isAdmin?: boolean;
       };
 
-      const member = db.members.find((m) => m.id === memberId);
-      if (!member) {
+      const willBePastor = Boolean(isPastor);
+      const willBeAdmin = willBePastor && Boolean(isAdmin);
+
+      // Encontra o pastor na lista de pastores
+      let pastor = db.pastors.find(
+        (p) =>
+          (pastorId && p.id === pastorId) ||
+          (memberId && (p.memberId === memberId || p.id === `pas-${memberId}`)) ||
+          (pastorName && p.name.toLowerCase() === pastorName.trim().toLowerCase())
+      );
+
+      // Encontra o membro correspondente na lista de membros
+      let member = db.members.find(
+        (m) =>
+          (memberId && m.id === memberId) ||
+          (pastor?.memberId && m.id === pastor.memberId) ||
+          (pastor && (m.id === pastor.id.replace(/^pas-/, "") || m.name.toLowerCase() === pastor.name.toLowerCase())) ||
+          (pastorName && m.name.toLowerCase() === pastorName.trim().toLowerCase())
+      );
+
+      if (!member && !pastor) {
         return NextResponse.json(
-          { error: "Membro não encontrado." },
+          { error: "Membro ou pastor não encontrado." },
           { status: 404 }
         );
       }
 
-      const willBePastor = Boolean(isPastor);
-      const willBeAdmin = willBePastor && Boolean(isAdmin);
-
-      member.isPastor = willBePastor;
-      member.isAdmin = willBeAdmin;
-      member.portalRole = willBePastor
-        ? willBeAdmin
-          ? "admin"
-          : "pastor"
-        : "membro";
-
       if (willBePastor) {
-        let existingPastor = db.pastors.find(
-          (p) =>
-            p.memberId === member.id ||
-            p.name.toLowerCase() === member.name.toLowerCase()
-        );
+        if (!member) {
+          return NextResponse.json(
+            { error: "Membro não encontrado para nomeação pastoral." },
+            { status: 404 }
+          );
+        }
+        member.isPastor = true;
+        member.isAdmin = willBeAdmin;
+        member.portalRole = willBeAdmin ? "admin" : "pastor";
 
-        if (existingPastor) {
-          existingPastor.memberId = member.id;
-          existingPastor.accessRole = willBeAdmin ? "admin" : "pastor";
-          if (member.phone) existingPastor.phone = member.phone;
+        if (pastor) {
+          pastor.memberId = member.id;
+          pastor.accessRole = willBeAdmin ? "admin" : "pastor";
+          if (member.phone) pastor.phone = member.phone;
         } else {
           const defaultUsername = (
             member.email?.split("@")[0] ||
             member.name.toLowerCase().replace(/\s+/g, "")
           ).slice(0, 20);
 
-          const newPastor: PastorLeader = {
+          pastor = {
             id: `pas-${member.id}`,
             name: member.name,
             role: "Pastores",
@@ -992,14 +1006,31 @@ export async function POST(request: Request) {
             accessRole: willBeAdmin ? "admin" : "pastor",
             memberId: member.id,
           };
-          db.pastors.push(newPastor);
+          db.pastors.push(pastor);
         }
       } else {
-        // Remove da lista de pastores
+        // REMOVER DA FUNÇÃO PASTORAL
+        if (member) {
+          member.isPastor = false;
+          member.isAdmin = false;
+          member.portalRole = "membro";
+        }
+
+        const idsToRemove = new Set<string>();
+        if (pastorId) idsToRemove.add(pastorId);
+        if (pastor?.id) idsToRemove.add(pastor.id);
+        if (member?.id) idsToRemove.add(`pas-${member.id}`);
+
+        const namesToRemove = new Set<string>();
+        if (pastor?.name) namesToRemove.add(pastor.name.toLowerCase());
+        if (member?.name) namesToRemove.add(member.name.toLowerCase());
+        if (pastorName) namesToRemove.add(pastorName.trim().toLowerCase());
+
         db.pastors = db.pastors.filter(
           (p) =>
-            p.memberId !== member.id &&
-            p.name.toLowerCase() !== member.name.toLowerCase()
+            !idsToRemove.has(p.id) &&
+            !namesToRemove.has(p.name.toLowerCase()) &&
+            (!member || p.memberId !== member.id)
         );
       }
 
@@ -1007,18 +1038,32 @@ export async function POST(request: Request) {
 
       if (supabase) {
         try {
-          await supabase
-            .from("members")
-            .upsert(mapMemberToRow(member), { onConflict: "id" });
+          if (member) {
+            await supabase
+              .from("members")
+              .upsert(mapMemberToRow(member), { onConflict: "id" });
+          }
 
-          if (willBePastor) {
-            const pastorToSync = db.pastors.find(
-              (p) => p.memberId === member.id || p.name === member.name
-            );
-            if (pastorToSync) {
-              await supabase
-                .from("pastors")
-                .upsert(mapPastorToRow(pastorToSync), { onConflict: "id" });
+          if (willBePastor && pastor) {
+            await supabase
+              .from("pastors")
+              .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+          } else if (!willBePastor) {
+            // Remove do Supabase pastors table
+            if (pastorId) {
+              await supabase.from("pastors").delete().eq("id", pastorId);
+            }
+            if (pastor?.id && pastor.id !== pastorId) {
+              await supabase.from("pastors").delete().eq("id", pastor.id);
+            }
+            if (member?.id) {
+              await supabase.from("pastors").delete().eq("id", `pas-${member.id}`);
+            }
+            if (pastor?.name) {
+              await supabase.from("pastors").delete().eq("name", pastor.name);
+            }
+            if (member?.name && member.name !== pastor?.name) {
+              await supabase.from("pastors").delete().eq("name", member.name);
             }
           }
         } catch (supaErr) {
@@ -1054,6 +1099,7 @@ export async function POST(request: Request) {
       const member = db.members.find(
         (m) =>
           m.id === pastor.memberId ||
+          m.id === pastor.id.replace(/^pas-/, "") ||
           m.name.toLowerCase() === pastor.name.toLowerCase()
       );
       if (member) {

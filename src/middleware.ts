@@ -5,12 +5,32 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const { pathname } = request.nextUrl;
 
-  // Se o host for do subdomínio de membros (membros.igrejadoalto.com ou membros.localhost)
+  // 1. Subdomínio de membros (membros.igrejadoalto.com ou membros.localhost)
   if (host.startsWith("membros.")) {
-    // Se estiver na raiz do subdomínio de membros, reescreve internamente para /membros
     if (pathname === "/") {
       return NextResponse.rewrite(new URL("/membros", request.url));
     }
+  }
+
+  // 2. Subdomínio de bem-vindo (bemvindo.igrejadoalto.com ou bemvindo.localhost)
+  // Também mantém compatibilidade caso acessem bemvindos.
+  if (host.startsWith("bemvindo.") || host.startsWith("bemvindos.")) {
+    if (pathname === "/") {
+      return NextResponse.rewrite(new URL("/bem-vindo", request.url));
+    }
+    if (pathname.startsWith("/bem-vindos")) {
+      const target = pathname.replace(/^\/bem-vindos/, "/bem-vindo");
+      return NextResponse.rewrite(new URL(target, request.url));
+    }
+    if (!pathname.startsWith("/bem-vindo")) {
+      return NextResponse.rewrite(new URL(`/bem-vindo${pathname}`, request.url));
+    }
+  }
+
+  // 3. Redirecionamento amigável de /bem-vindos para /bem-vindo na navegação direta
+  if (pathname.startsWith("/bem-vindos")) {
+    const target = pathname.replace(/^\/bem-vindos/, "/bem-vindo");
+    return NextResponse.rewrite(new URL(target, request.url));
   }
 
   return NextResponse.next();
