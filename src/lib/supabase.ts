@@ -256,7 +256,8 @@ export function mapMemberToRow(m: Member) {
     follow_up_responsible: m.followUpResponsible ?? null,
     leadership_alert: m.leadershipAlert ?? null,
     notes: finalNotes,
-    photo_url: m.photoUrl ?? null,
+    // OBS: a coluna photo_url não existe na tabela members do Supabase.
+    // A foto é persistida dentro do payload [[MEMBER_PORTAL]] em notes (photoUrl).
     // Colunas diretas do Portal do Membro & Núcleo Familiar
     cpf: m.cpf ?? null,
     email: m.email ?? null,

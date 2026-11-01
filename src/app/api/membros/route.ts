@@ -487,7 +487,7 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("members")
-            .upsert(mapMemberToRow(memberToSave), { onConflict: "id" });
+            .upsert(mapMemberToRow(memberToSave), { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao persistir novo membro no Supabase:", supaErr);
         }
@@ -734,7 +734,7 @@ export async function POST(request: Request) {
         try {
           const toUpsert = [mapMemberToRow(member)];
           if (spouse) toUpsert.push(mapMemberToRow(spouse));
-          await supabase.from("members").upsert(toUpsert, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpsert, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao atualizar membro no Supabase:", supaErr);
         }
@@ -763,6 +763,16 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: "Membro titular não encontrado." },
           { status: 404 }
+        );
+      }
+
+      if (
+        (cleanSpouseCpf && cleanDigits(member.cpf) === cleanSpouseCpf) ||
+        (member.email && member.email.trim().toLowerCase() === normSpouseEmail)
+      ) {
+        return NextResponse.json(
+          { error: "Este CPF/e-mail é o seu próprio. Informe o CPF ou e-mail do seu cônjuge." },
+          { status: 400 }
         );
       }
 
@@ -834,7 +844,7 @@ export async function POST(request: Request) {
               .upsert(
                 [mapMemberToRow(member), mapMemberToRow(spouse)],
                 { onConflict: "id" }
-              );
+              ).throwOnError();
           } catch (supaErr) {
             console.error("Erro ao vincular cônjuge no Supabase:", supaErr);
           }
@@ -880,11 +890,15 @@ export async function POST(request: Request) {
             .upsert(
               [mapMemberToRow(member), mapMemberToRow(spouse)],
               { onConflict: "id" }
-            );
+            ).throwOnError();
         } catch (supaErr) {
           console.error(
             "Erro ao registrar notificação de vínculo no Supabase:",
             supaErr
+          );
+          return NextResponse.json(
+            { error: "Não foi possível registrar a solicitação de vínculo. Tente novamente." },
+            { status: 500 }
           );
         }
       }
@@ -934,7 +948,7 @@ export async function POST(request: Request) {
             .upsert(
               [mapMemberToRow(member), mapMemberToRow(requester)],
               { onConflict: "id" }
-            );
+            ).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao aceitar vínculo no Supabase:", supaErr);
         }
@@ -981,7 +995,7 @@ export async function POST(request: Request) {
         try {
           const toUpdate = [mapMemberToRow(member)];
           if (requester) toUpdate.push(mapMemberToRow(requester));
-          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao recusar vínculo no Supabase:", supaErr);
         }
@@ -1020,7 +1034,7 @@ export async function POST(request: Request) {
         try {
           const toUpdate = [mapMemberToRow(member)];
           if (target) toUpdate.push(mapMemberToRow(target));
-          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error(
             "Erro ao cancelar solicitação de vínculo no Supabase:",
@@ -1077,7 +1091,7 @@ export async function POST(request: Request) {
         try {
           const toUpsert = [mapMemberToRow(member)];
           if (spouse) toUpsert.push(mapMemberToRow(spouse));
-          await supabase.from("members").upsert(toUpsert, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpsert, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao desvincular cônjuge no Supabase:", supaErr);
         }
@@ -1169,7 +1183,7 @@ export async function POST(request: Request) {
         try {
           const toUpdate = [mapMemberToRow(member)];
           if (spouse) toUpdate.push(mapMemberToRow(spouse));
-          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao salvar dependente no Supabase:", supaErr);
         }
@@ -1240,9 +1254,13 @@ export async function POST(request: Request) {
         try {
           const toUpdate = [mapMemberToRow(member)];
           if (spouse) toUpdate.push(mapMemberToRow(spouse));
-          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao remover dependente no Supabase:", supaErr);
+          return NextResponse.json(
+            { error: "Não foi possível salvar a remoção no banco de dados. Tente novamente." },
+            { status: 500 }
+          );
         }
       }
 
@@ -1314,7 +1332,7 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("visit_requests")
-            .upsert(mapRequestToRow(newRequest), { onConflict: "id" });
+            .upsert(mapRequestToRow(newRequest), { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao salvar solicitação do membro no Supabase:", supaErr);
         }
@@ -1430,13 +1448,13 @@ export async function POST(request: Request) {
           if (member) {
             await supabase
               .from("members")
-              .upsert(mapMemberToRow(member), { onConflict: "id" });
+              .upsert(mapMemberToRow(member), { onConflict: "id" }).throwOnError();
           }
 
           if (willBePastor && pastor) {
             await supabase
               .from("pastors")
-              .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+              .upsert(mapPastorToRow(pastor), { onConflict: "id" }).throwOnError();
           } else if (!willBePastor) {
             // Remove do Supabase pastors table
             if (pastorId) {
@@ -1502,11 +1520,11 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("pastors")
-            .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+            .upsert(mapPastorToRow(pastor), { onConflict: "id" }).throwOnError();
           if (member) {
             await supabase
               .from("members")
-              .upsert(mapMemberToRow(member), { onConflict: "id" });
+              .upsert(mapMemberToRow(member), { onConflict: "id" }).throwOnError();
           }
         } catch (supaErr) {
           console.error("Erro ao atualizar acesso pastoral no Supabase:", supaErr);
@@ -1662,7 +1680,7 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("members")
-            .upsert(mapMemberToRow(newMember), { onConflict: "id" });
+            .upsert(mapMemberToRow(newMember), { onConflict: "id" }).throwOnError();
           if (willBePastor) {
             const pastorToSave = db.pastors.find(
               (p) => p.memberId === newMember.id
@@ -1670,7 +1688,7 @@ export async function POST(request: Request) {
             if (pastorToSave) {
               await supabase
                 .from("pastors")
-                .upsert(mapPastorToRow(pastorToSave), { onConflict: "id" });
+                .upsert(mapPastorToRow(pastorToSave), { onConflict: "id" }).throwOnError();
             }
           }
         } catch (supaErr) {
@@ -1710,7 +1728,7 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("members")
-            .upsert(mapMemberToRow(member), { onConflict: "id" });
+            .upsert(mapMemberToRow(member), { onConflict: "id" }).throwOnError();
         } catch (supaErr) {
           console.error("Erro ao atualizar ministérios no Supabase:", supaErr);
         }
