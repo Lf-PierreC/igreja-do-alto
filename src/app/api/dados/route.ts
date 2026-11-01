@@ -90,11 +90,56 @@ function writeLocalDb(data: DatabaseSchema) {
   }
 }
 
+function syncPastorsWithMembers(db: DatabaseSchema): DatabaseSchema {
+  const currentPastors = [...(db.pastors || [])];
+  const existingMemberIds = new Set(
+    currentPastors
+      .map((p) =>
+        p.memberId || (p.id.startsWith("pas-") ? p.id.replace(/^pas-/, "") : "")
+      )
+      .filter(Boolean)
+  );
+  const existingNames = new Set(
+    currentPastors.map((p) => p.name.trim().toLowerCase())
+  );
+
+  for (const m of db.members || []) {
+    if (m.isPastor || m.portalRole === "pastor" || m.portalRole === "admin") {
+      if (
+        !existingMemberIds.has(m.id) &&
+        !existingNames.has(m.name.trim().toLowerCase())
+      ) {
+        currentPastors.push({
+          id: `pas-${m.id}`,
+          name: m.name,
+          role: "Pastores",
+          phone: m.phone || "",
+          regionFocus: "Igreja do Alto",
+          username: (
+            m.email?.split("@")[0] || deriveDefaultUsername(m.name)
+          ).toLowerCase(),
+          password: m.password || "igrejadoalto",
+          accessRole:
+            m.isAdmin || m.portalRole === "admin" ? "admin" : "pastor",
+          memberId: m.id,
+        });
+        existingMemberIds.add(m.id);
+        existingNames.add(m.name.trim().toLowerCase());
+      }
+    }
+  }
+
+  db.pastors = normalizePastorsList(currentPastors);
+  return db;
+}
+
 async function loadDatabase(): Promise<DatabaseSchema> {
   const supabase = getSupabaseClient();
+  let db: DatabaseSchema;
   if (supabase) {
     try {
-      return await fetchDatabaseFromSupabase(supabase);
+      db = await fetchDatabaseFromSupabase(supabase);
+      return syncPastorsWithMembers(db);
     } catch (err) {
       console.error(
         "Erro ao consultar Supabase (usando banco local como fallback):",
@@ -102,7 +147,8 @@ async function loadDatabase(): Promise<DatabaseSchema> {
       );
     }
   }
-  return readLocalDb();
+  db = readLocalDb();
+  return syncPastorsWithMembers(db);
 }
 
 export async function GET() {

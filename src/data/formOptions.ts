@@ -225,6 +225,7 @@ export const CHURCH_MINISTRIES: MinistryGroup[] = [
   {
     category: "Comunicação, Mídia & Artes",
     items: [
+      { id: "Som", label: "Som" },
       { id: "Mídia – Iluminação", label: "Mídia – Iluminação" },
       { id: "Mídia – Transmissão", label: "Mídia – Transmissão" },
       { id: "Mídia – Câmeras", label: "Mídia – Câmeras" },
@@ -265,7 +266,7 @@ export const CHURCH_MINISTRIES: MinistryGroup[] = [
         id: "Louvor – Instrumental",
         label: "Louvor – Instrumental",
         description:
-          "Instrumentos musicais (teclado, violão, guitarra, baixo, bateria, etc.)",
+          "Instrumentos musicais (teclado, violão, guitarra, baixo, bateria, outros…)",
         requiresAudition: true,
       },
     ],

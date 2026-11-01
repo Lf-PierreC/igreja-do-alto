@@ -85,6 +85,8 @@ import {
   Award,
   MessageCircle,
   AlertTriangle,
+  Camera,
+  Upload,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
@@ -134,6 +136,8 @@ export default function PortalDoMembroPage() {
   const [regParticipates, setRegParticipates] = useState<"Sim" | "Não" | "">("");
   const [regActivityName, setRegActivityName] = useState("");
   const [regCurrentMinistries, setRegCurrentMinistries] = useState<string[]>([]);
+  const [regPhotoUrl, setRegPhotoUrl] = useState("");
+  const [isCompressingPhotoReg, setIsCompressingPhotoReg] = useState(false);
 
   // Dados do Membro Logado
   const [memberData, setMemberData] = useState<Member | null>(null);
@@ -211,6 +215,8 @@ export default function PortalDoMembroPage() {
   const [editCurrentMinistries, setEditCurrentMinistries] = useState<string[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [editPhotoUrl, setEditPhotoUrl] = useState("");
+  const [isCompressingPhotoEdit, setIsCompressingPhotoEdit] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Estados da Aba Ministérios (Voluntariado e Áreas de Interesse)
@@ -292,10 +298,12 @@ export default function PortalDoMembroPage() {
   const [cepErrorAddMem, setCepErrorAddMem] = useState<string | null>(null);
   const [addMemRelationship, setAddMemRelationship] = useState<ChurchRelationship>("Membro");
   const [addMemAttendanceTime, setAddMemAttendanceTime] = useState<AttendanceTime | "">("");
-  const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não">("");
+  const [addMemParticipates, setAddMemParticipates] = useState<"Sim" | "Não" | "">("");
   const [addMemActivityName, setAddMemActivityName] = useState("");
   const [addMemCurrentMinistries, setAddMemCurrentMinistries] = useState<string[]>([]);
   const [addMemPassword, setAddMemPassword] = useState("igrejadoalto");
+  const [addMemPhotoUrl, setAddMemPhotoUrl] = useState("");
+  const [isCompressingPhotoAddMem, setIsCompressingPhotoAddMem] = useState(false);
   const [addMemIsPastor, setAddMemIsPastor] = useState(false);
   const [addMemIsAdmin, setAddMemIsAdmin] = useState(false);
   const [isSavingAddMember, setIsSavingAddMember] = useState(false);
@@ -316,7 +324,7 @@ export default function PortalDoMembroPage() {
         if (parsed && parsed.id) {
           setSession(parsed);
           loadMemberDashboard(parsed.id);
-          if (parsed.isAdmin || parsed.isPastor) {
+          if (parsed.isAdmin) {
             setActiveTab("todos-membros");
           }
         }
@@ -346,6 +354,48 @@ export default function PortalDoMembroPage() {
     } catch (err) {
       console.error("Erro ao carregar dados do membro:", err);
     }
+  };
+
+  const handlePhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onComplete: (base64: string) => void,
+    onLoading: (loading: boolean) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onLoading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        onComplete(dataUrl);
+        onLoading(false);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -381,7 +431,7 @@ export default function PortalDoMembroPage() {
       if (data.pastors) setPastorsList(data.pastors);
       if (data.reports) setAllReports(data.reports);
 
-      if (data.session.isAdmin || data.session.isPastor) {
+      if (data.session.isAdmin) {
         setActiveTab("todos-membros");
       }
 
@@ -510,6 +560,7 @@ export default function PortalDoMembroPage() {
             },
             currentMinistries: regCurrentMinistries,
             password: regPassword,
+            photoUrl: regPhotoUrl || undefined,
           },
         }),
       });
@@ -856,6 +907,7 @@ export default function PortalDoMembroPage() {
     setEditParticipates(memberData.participatesInActivity ? "Sim" : "Não");
     setEditActivityName(memberData.activityName || "");
     setEditCurrentMinistries(memberData.currentMinistries || []);
+    setEditPhotoUrl(memberData.photoUrl || "");
     setEditError(null);
     setEditSuccess(null);
     setIsEditingProfile(true);
@@ -918,6 +970,7 @@ export default function PortalDoMembroPage() {
               },
               currentMinistries: editCurrentMinistries,
               password: editPassword.trim() || undefined,
+              photoUrl: editPhotoUrl || undefined,
             },
           },
         }),
@@ -1017,6 +1070,7 @@ export default function PortalDoMembroPage() {
             },
             currentMinistries: addMemCurrentMinistries,
             password: addMemPassword.trim() || "igrejadoalto",
+            photoUrl: addMemPhotoUrl || undefined,
             isPastor: Boolean(addMemIsPastor),
             isAdmin: Boolean(addMemIsAdmin),
           },
@@ -1045,6 +1099,8 @@ export default function PortalDoMembroPage() {
       setAddMemNumber("");
       setAddMemComplement("");
       setAddMemNeighborhood("");
+      setAddMemPhotoUrl("");
+      setAddMemPassword("igrejadoalto");
       setAddMemCurrentMinistries([]);
       setAddMemIsPastor(false);
       setAddMemIsAdmin(false);
@@ -1254,7 +1310,7 @@ export default function PortalDoMembroPage() {
   };
 
   const handleOpenVisitsPortal = (
-    targetTab?: "pessoas" | "nova-visita" | "dashboard" | React.MouseEvent
+    targetTab?: "pessoas" | "nova-visita" | "dashboard" | "agenda" | React.MouseEvent
   ) => {
     if (!session) return;
     const tab = typeof targetTab === "string" ? targetTab : "pessoas";
@@ -1424,6 +1480,61 @@ export default function PortalDoMembroPage() {
                     <p className="text-xs text-[#252525]/75 font-semibold mt-1">
                       Cadastro único nacional vinculado ao CPF para cuidado pastoral da sua família.
                     </p>
+                  </div>
+
+                  {/* Foto de Perfil do Membro */}
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-white border-2 border-[#252525]/15">
+                    <div className="relative w-20 h-20 rounded-2xl bg-[#F4F3EE] border-2 border-dashed border-[#252525]/30 overflow-hidden flex items-center justify-center shrink-0">
+                      {regPhotoUrl ? (
+                        <img
+                          src={regPhotoUrl}
+                          alt="Foto do Membro"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Camera className="w-8 h-8 text-[#252525]/40" />
+                      )}
+                      {isCompressingPhotoReg && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1 text-center sm:text-left">
+                      <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                        Foto de Perfil (Opcional)
+                      </label>
+                      <p className="text-[11px] text-[#252525]/70">
+                        Adicione sua foto para identificação no cadastro pastoral da igreja.
+                      </p>
+                      <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#3D3D3D] text-[#DCDACF] text-xs font-bold cursor-pointer transition-colors shadow-sm">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{regPhotoUrl ? "Trocar Foto" : "Enviar Foto"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) =>
+                              handlePhotoUpload(
+                                e,
+                                (base64) => setRegPhotoUrl(base64),
+                                setIsCompressingPhotoReg
+                              )
+                            }
+                          />
+                        </label>
+                        {regPhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setRegPhotoUrl("")}
+                            className="px-2.5 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-colors"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Nome Completo */}
@@ -1728,7 +1839,7 @@ export default function PortalDoMembroPage() {
                     {/* Pergunta 3: Participa de atividade */}
                     <div className="space-y-2 pt-2">
                       <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
-                        Participa de alguma Casa do Alto, ministério ou atividade da igreja?
+                        Participa de alguma Casa do Alto?
                       </label>
                       <div className="grid grid-cols-2 gap-2 max-w-xs">
                         {(["Sim", "Não"] as const).map((opt) => {
@@ -1772,13 +1883,13 @@ export default function PortalDoMembroPage() {
                     {regParticipates === "Sim" && (
                       <div className="space-y-1.5 pt-1">
                         <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
-                          Se sim: qual?
+                          Qual Casa do Alto?
                         </label>
                         <input
                           type="text"
                           value={regActivityName}
                           onChange={(e) => setRegActivityName(e.target.value)}
-                          placeholder="Informe qual Casa do Alto, ministério ou atividade participa"
+                          placeholder="Informe o nome ou líder da sua Casa do Alto"
                           className="w-full rounded-2xl border-2 border-[#252525]/25 bg-white p-3 text-xs sm:text-sm font-semibold text-[#252525]"
                         />
                       </div>
@@ -2027,8 +2138,20 @@ export default function PortalDoMembroPage() {
                   </span>
                 ) : null}
               </div>
-             
             </div>
+
+            {(session.isAdmin || session.isPastor) && (
+              <button
+                type="button"
+                onClick={() => handleOpenVisitsPortal("agenda")}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3D3D3D] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                title="Abrir o Portal Pastoral de Visitas"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5 text-[#EBD57B]" />
+                <span>Portal de Visitas</span>
+                <ExternalLink className="w-3 h-3 opacity-70" />
+              </button>
+            )}
 
             <button
               type="button"
@@ -2057,7 +2180,7 @@ export default function PortalDoMembroPage() {
               icon: any;
             }[] = [];
 
-            if (session.isAdmin || session.isPastor) {
+            if (session.isAdmin) {
               tabs.push({
                 id: "todos-membros",
                 label: `Membros (${allMembers.length})`,
@@ -2068,9 +2191,6 @@ export default function PortalDoMembroPage() {
                 label: "Voluntariado",
                 icon: Sparkles,
               });
-            }
-
-            if (session.isAdmin) {
               tabs.push({
                 id: "gestao-pastores",
                 label: `Gestão de Equipe (${pastorsList.length})`,
@@ -2084,7 +2204,7 @@ export default function PortalDoMembroPage() {
               icon: Home,
             });
 
-            if (!session.isAdmin && !session.isPastor) {
+            if (!session.isAdmin) {
               tabs.push({
                 id: "ministerios",
                 label: "Quero Servir",
@@ -2611,7 +2731,7 @@ export default function PortalDoMembroPage() {
                           onChange={(e) => setUseCustomAddress(e.target.checked)}
                           className="w-4 h-4 rounded"
                         />
-                        <span>Será em outro endereço (ex: hospital)</span>
+                        <span>Será em outro endereço (ex: hospital, trabalho)</span>
                       </label>
                     </div>
 
@@ -2627,7 +2747,7 @@ export default function PortalDoMembroPage() {
                             required
                             value={customStreet}
                             onChange={(e) => setCustomStreet(e.target.value)}
-                            placeholder="Rua / Hospital"
+                            placeholder="Rua / Local (ex: hospital, trabalho)"
                             className="w-full rounded-xl border border-[#252525]/30 p-2 text-xs font-semibold"
                           />
                         </div>
@@ -2826,6 +2946,41 @@ export default function PortalDoMembroPage() {
             {!isEditingProfile ? (
               /* MODO VISUALIZAÇÃO */
               <div className="space-y-4">
+                {/* Banner de Perfil com Foto */}
+                <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 flex items-center gap-4 shadow-sm">
+                  {memberData.photoUrl ? (
+                    <img
+                      src={memberData.photoUrl}
+                      alt={memberData.name}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-[#CB4B3B] shadow-md shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-[#CB4B3B]/10 text-[#CB4B3B] border-2 border-dashed border-[#CB4B3B]/30 flex flex-col items-center justify-center shrink-0">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-black text-[#252525] truncate">
+                        {memberData.name}
+                      </h3>
+                      {memberData.isAdmin && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase">
+                          👑 Admin
+                        </span>
+                      )}
+                      {memberData.isPastor && !memberData.isAdmin && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase">
+                          🤝 Pastor
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-[#252525]/60 font-semibold block mt-0.5">
+                      {memberData.photoUrl ? "Foto de perfil vinculada" : "Sem foto cadastrada (clique em Editar para adicionar)"} • {memberData.relationship || "Membro"}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
                   <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
                     <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
@@ -2917,7 +3072,7 @@ export default function PortalDoMembroPage() {
 
                     <div className="sm:col-span-2">
                       <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
-                        Casa do Alto, Ministério ou Atividade
+                        Participação em Casa do Alto
                       </span>
                       <strong className="text-sm font-black">
                         {memberData.participatesInActivity
@@ -3006,6 +3161,58 @@ export default function PortalDoMembroPage() {
                     <span>{editError}</span>
                   </div>
                 )}
+
+                {/* Foto de Perfil */}
+                <div className="p-4 rounded-2xl bg-white border-2 border-[#252525]/15 space-y-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
+                    Foto de Perfil
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-[#F4F3EE] border-2 border-dashed border-[#252525]/30 flex items-center justify-center overflow-hidden shrink-0 relative">
+                      {editPhotoUrl ? (
+                        <img
+                          src={editPhotoUrl}
+                          alt="Foto"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Camera className="w-6 h-6 text-[#252525]/40" />
+                      )}
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold cursor-pointer transition-colors shadow">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{isCompressingPhotoEdit ? "Otimizando..." : editPhotoUrl ? "Trocar Foto" : "Escolher Foto"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) =>
+                              handlePhotoUpload(
+                                e,
+                                (b64) => setEditPhotoUrl(b64),
+                                setIsCompressingPhotoEdit
+                              )
+                            }
+                          />
+                        </label>
+                        {editPhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPhotoUrl("")}
+                            className="px-2.5 py-1 text-xs text-red-600 font-bold hover:underline"
+                          >
+                            Remover foto
+                          </button>
+                        )}
+                      </div>
+                      <span className="block text-[10px] text-[#252525]/60">
+                        A foto será otimizada automaticamente para seu perfil na igreja.
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider mb-1">
@@ -3328,10 +3535,10 @@ export default function PortalDoMembroPage() {
                     </div>
                   </div>
 
-                  {/* Pergunta 3: Participa de atividade */}
+                  {/* Pergunta 3: Participa de Casa do Alto */}
                   <div className="space-y-2 pt-2">
                     <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
-                      Participa de alguma Casa do Alto, ministério ou atividade da igreja?
+                      Participa de alguma Casa do Alto?
                     </label>
                     <div className="grid grid-cols-2 gap-2 max-w-xs">
                       {(["Sim", "Não"] as const).map((opt) => {
@@ -3375,13 +3582,13 @@ export default function PortalDoMembroPage() {
                   {editParticipates === "Sim" && (
                     <div className="space-y-1.5 pt-1">
                       <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
-                        Se sim: qual?
+                        Qual Casa do Alto?
                       </label>
                       <input
                         type="text"
                         value={editActivityName}
                         onChange={(e) => setEditActivityName(e.target.value)}
-                        placeholder="Informe qual Casa do Alto, ministério ou atividade participa"
+                        placeholder="Informe qual Casa do Alto participa"
                         className="w-full rounded-2xl border-2 border-[#252525]/25 bg-white p-3 text-xs sm:text-sm font-semibold text-[#252525]"
                       />
                     </div>
@@ -3523,9 +3730,9 @@ export default function PortalDoMembroPage() {
         )}
 
         {/* ===================================================================
-            ABA 5: TODOS OS MEMBROS (Admin & Pastor)
+            ABA 5: TODOS OS MEMBROS (Apenas Admin)
            =================================================================== */}
-        {activeTab === "todos-membros" && (session?.isPastor || session?.isAdmin) && (
+        {activeTab === "todos-membros" && session?.isAdmin && (
           <div className="space-y-6">
             {/* Cabeçalho da Aba */}
             <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3684,9 +3891,17 @@ export default function PortalDoMembroPage() {
                       >
                         {/* Coluna 1: Membro / Identificação */}
                         <div className="lg:col-span-4 flex items-center gap-3 w-full">
-                          <div className="w-10 h-10 rounded-2xl bg-[#DCDACF] text-[#252525] group-hover:bg-[#CB4B3B] group-hover:text-white transition-colors flex items-center justify-center font-black text-sm shrink-0">
-                            {m.name.slice(0, 2).toUpperCase()}
-                          </div>
+                          {m.photoUrl ? (
+                            <img
+                              src={m.photoUrl}
+                              alt={m.name}
+                              className="w-10 h-10 rounded-2xl object-cover border border-[#252525]/15 shrink-0 shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-2xl bg-[#DCDACF] text-[#252525] group-hover:bg-[#CB4B3B] group-hover:text-white transition-colors flex items-center justify-center font-black text-sm shrink-0">
+                              {m.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-sm font-black text-[#252525] truncate">
@@ -3815,14 +4030,14 @@ export default function PortalDoMembroPage() {
                   Ministérios & Quero Servir
                 </h2>
                 <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1 max-w-2xl">
-                  {session.isAdmin || session.isPastor
+                  {session.isAdmin
                     ? "Gerencie as equipes ministeriais, veja voluntários atuantes e responda com carinho aos membros interessados em servir."
                     : "Você sente o desejo de servir a Deus na igreja mas não sabia como começar ou tinha vergonha de falar com alguém? Este espaço foi feito para você dar esse passo com toda tranquilidade!"}
                 </p>
               </div>
 
-              {/* Se for Pastor ou Admin: seletor de visualização (Relatório vs Formulário de Interesse) */}
-              {(session.isAdmin || session.isPastor) && (
+              {/* Se for Admin: seletor de visualização (Relatório vs Formulário de Interesse) */}
+              {session.isAdmin && (
                 <div className="flex bg-[#252525] p-1.5 rounded-2xl gap-1 shrink-0">
                   <button
                     type="button"
@@ -3877,8 +4092,8 @@ export default function PortalDoMembroPage() {
               </div>
             )}
 
-            {/* MODO 1: RELATÓRIO DE VOLUNTÁRIOS (LIDERANÇA & PASTORES) */}
-            {(session.isAdmin || session.isPastor) && ministryViewMode === "relatorio" ? (
+            {/* MODO 1: RELATÓRIO DE VOLUNTÁRIOS (APENAS ADMINISTRADORES) */}
+            {session.isAdmin && ministryViewMode === "relatorio" ? (
               <div className="space-y-6">
                 {/* Indicadores do Relatório */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -4247,13 +4462,16 @@ export default function PortalDoMembroPage() {
                           {isLouvorGroup && (
                             <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-amber-950 flex items-start gap-3 mt-2">
                               <Music className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                              <div className="text-xs leading-relaxed">
+                              <div className="text-xs leading-relaxed space-y-1">
                                 <strong className="font-bold block text-amber-900">
                                   Observação para o Ministério de Louvor:
                                 </strong>
-                                <span>
-                                  O ingresso no ministério de Louvor é realizado mediante uma breve audição musical com a nossa equipe de louvor. Ao marcar seu interesse, nossa liderança musical agendará um momento agradável para ouvir você cantar ou tocar!
-                                </span>
+                                <p>
+                                  O ingresso no ministério de Louvor é realizado mediante uma <strong>agenda prévia estabelecida de audições da Igreja do Alto</strong>.
+                                </p>
+                                <p className="text-amber-900/90 text-[11px]">
+                                  A igreja realiza períodos específicos de audições ao longo do ano (não temos datas fixas contínuas e as audições não são feitas de forma imediata). Ao manifestar seu interesse aqui, seu nome e contato ficam registrados em nosso banco de talentos e a liderança do Louvor entrará em contato quando o próximo ciclo oficial de audições for aberto!
+                                </p>
                               </div>
                             </div>
                           )}
@@ -4621,6 +4839,55 @@ export default function PortalDoMembroPage() {
             </div>
           )}
 
+          {/* Foto de Perfil do Novo Membro */}
+          <div className="p-3 rounded-2xl bg-[#F4F3EE] border border-[#252525]/15 space-y-2">
+            <label className="block text-[11px] font-black uppercase text-[#252525]">
+              Foto do Membro (Opcional)
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-white border-2 border-dashed border-[#252525]/30 flex items-center justify-center overflow-hidden shrink-0 relative">
+                {addMemPhotoUrl ? (
+                  <img
+                    src={addMemPhotoUrl}
+                    alt="Foto do Membro"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Camera className="w-5 h-5 text-[#252525]/40" />
+                )}
+              </div>
+              <div className="space-y-1 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold cursor-pointer transition-colors shadow">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isCompressingPhotoAddMem ? "Otimizando..." : addMemPhotoUrl ? "Trocar Foto" : "Enviar Foto"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) =>
+                        handlePhotoUpload(
+                          e,
+                          (b64) => setAddMemPhotoUrl(b64),
+                          setIsCompressingPhotoAddMem
+                        )
+                      }
+                    />
+                  </label>
+                  {addMemPhotoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAddMemPhotoUrl("")}
+                      className="px-2 py-1 text-xs text-red-600 font-bold hover:underline"
+                    >
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <label className="block text-[11px] font-black uppercase text-[#252525] mb-1">
@@ -4787,6 +5054,19 @@ export default function PortalDoMembroPage() {
 
               <div>
                 <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
+                  Complemento
+                </label>
+                <input
+                  type="text"
+                  value={addMemComplement}
+                  onChange={(e) => setAddMemComplement(e.target.value)}
+                  placeholder="Apto, Bloco, Casa..."
+                  className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[#252525]/80 mb-1">
                   Bairro
                 </label>
                 <input
@@ -4907,6 +5187,27 @@ export default function PortalDoMembroPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Senha de Acesso para o Novo Membro */}
+          <div className="p-3.5 rounded-2xl bg-white border border-[#252525]/15 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-[#CB4B3B]" />
+              <label className="block text-[11px] font-black uppercase text-[#252525]">
+                Senha de Acesso do Novo Usuário *
+              </label>
+            </div>
+            <input
+              type="text"
+              required
+              value={addMemPassword}
+              onChange={(e) => setAddMemPassword(e.target.value)}
+              placeholder="Senha inicial (padrão: igrejadoalto)"
+              className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-3 py-2 text-xs font-bold text-[#252525]"
+            />
+            <span className="block text-[10px] text-[#252525]/60">
+              O novo membro usará esta senha cadastrada (ou a sugestão inicial &quot;igrejadoalto&quot;) para entrar na plataforma.
+            </span>
           </div>
 
           {/* Se Admin: opção de promover diretamente a Pastor ou Admin */}
@@ -5086,9 +5387,17 @@ export default function PortalDoMembroPage() {
             {/* Header com Avatar, Badges e Contato Rápido */}
             <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-[#CB4B3B] text-[#DCDACF] flex items-center justify-center font-black text-xl shadow-md shrink-0">
-                  {selectedMemberDetail.name.slice(0, 2).toUpperCase()}
-                </div>
+                {selectedMemberDetail.photoUrl ? (
+                  <img
+                    src={selectedMemberDetail.photoUrl}
+                    alt={selectedMemberDetail.name}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#CB4B3B] shadow-md shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-[#CB4B3B] text-[#DCDACF] flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                    {selectedMemberDetail.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-black text-[#252525]">
@@ -5216,7 +5525,7 @@ export default function PortalDoMembroPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <span className="block text-[10px] text-[#252525]/60 font-bold uppercase">
-                    Participa de Casa do Alto / Atividade
+                    Participação em Casa do Alto
                   </span>
                   <strong className="text-xs font-black text-[#252525]">
                     {selectedMemberDetail.participatesInActivity

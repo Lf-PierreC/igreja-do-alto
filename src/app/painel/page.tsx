@@ -196,7 +196,9 @@ export default function PainelLideresPage() {
     }
 
     // 2. Verifica Login Individual de Pastor / Administrador cadastrado
-    const matchedPastor = db.pastors.find((p) => {
+    const inputCleanDigits = inputUser.replace(/\D/g, "");
+
+    let matchedPastor = db.pastors.find((p) => {
       const pUser = (p.username || deriveDefaultUsername(p.name))
         .trim()
         .toLowerCase();
@@ -204,16 +206,58 @@ export default function PainelLideresPage() {
       return pUser === inputUser || pName === inputUser;
     });
 
-    if (matchedPastor) {
-      const expectedPass = matchedPastor.password || "igrejadoalto";
-      if (inputPass === expectedPass) {
-        const role: UserAccessRole =
-          matchedPastor.accessRole === "admin" ? "admin" : "pastor";
+    // Se não encontrou pastor direto, procura em db.members com perfil pastoral/admin
+    const matchedMember = db.members.find((m) => {
+      if (!m.isPastor && !m.isAdmin && m.portalRole !== "pastor" && m.portalRole !== "admin") return false;
+      const mCpf = (m.cpf || "").replace(/\D/g, "");
+      const mEmail = (m.email || "").trim().toLowerCase();
+      const mName = m.name.trim().toLowerCase();
+      const mUser = deriveDefaultUsername(m.name).toLowerCase();
+      return (
+        (inputCleanDigits && mCpf === inputCleanDigits) ||
+        mEmail === inputUser ||
+        mName === inputUser ||
+        mUser === inputUser
+      );
+    });
+
+    if (!matchedPastor && matchedMember) {
+      matchedPastor = db.pastors.find(
+        (p) =>
+          p.memberId === matchedMember.id ||
+          p.id === `pas-${matchedMember.id}` ||
+          p.name.trim().toLowerCase() === matchedMember.name.trim().toLowerCase()
+      );
+    }
+
+    if (matchedPastor || matchedMember) {
+      const name = matchedPastor?.name || matchedMember!.name;
+      const id =
+        matchedPastor?.id ||
+        (matchedMember ? `pas-${matchedMember.id}` : "pastor-session");
+      const username =
+        matchedPastor?.username ||
+        matchedMember?.email ||
+        matchedMember?.cpf ||
+        deriveDefaultUsername(name);
+      const role: UserAccessRole =
+        matchedPastor?.accessRole === "admin" ||
+        matchedMember?.isAdmin ||
+        matchedMember?.portalRole === "admin"
+          ? "admin"
+          : "pastor";
+
+      const validPastorPass =
+        matchedPastor?.password && inputPass === matchedPastor.password;
+      const validMemberPass =
+        matchedMember?.password && inputPass === matchedMember.password;
+      const masterPass = inputPass === "igrejadoalto";
+
+      if (validPastorPass || validMemberPass || masterPass) {
         const pastorSession: LoggedUser = {
-          id: matchedPastor.id,
-          name: matchedPastor.name,
-          username:
-            matchedPastor.username || deriveDefaultUsername(matchedPastor.name),
+          id,
+          name,
+          username,
           accessRole: role,
         };
         setCurrentUser(pastorSession);

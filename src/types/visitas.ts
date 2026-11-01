@@ -133,6 +133,9 @@ export interface Member {
   portalRole?: "membro" | "pastor" | "admin";
   isPastor?: boolean;
   isAdmin?: boolean;
+
+  // Foto do Membro
+  photoUrl?: string;
 }
 
 /** 1. Formulário — Solicitação de Visita Pastoral */

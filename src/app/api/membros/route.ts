@@ -193,6 +193,7 @@ export async function POST(request: Request) {
         activityName,
         currentMinistries,
         interestedMinistries,
+        photoUrl,
       } = payload;
 
       const trimmedName = (name || "").trim();
@@ -301,6 +302,7 @@ export async function POST(request: Request) {
           interestedMinistries: Array.isArray(interestedMinistries)
             ? interestedMinistries
             : stub.interestedMinistries || [],
+          photoUrl: photoUrl || stub.photoUrl || undefined,
           isOfficialMember: true,
           familyId: stub.familyId || familyId,
           familyRole: "titular",
@@ -338,6 +340,7 @@ export async function POST(request: Request) {
           interestedMinistries: Array.isArray(interestedMinistries)
             ? interestedMinistries
             : [],
+          photoUrl: photoUrl || undefined,
           registeredAt: todayISO(),
           lastVisitDate: null,
           situation: "bem",
@@ -586,6 +589,8 @@ export async function POST(request: Request) {
       }
       if (updates.password && updates.password.trim())
         member.password = updates.password.trim();
+      if (updates.photoUrl !== undefined)
+        member.photoUrl = updates.photoUrl || undefined;
 
       // Se houver cônjuge vinculado e o endereço mudou, atualiza o endereço do cônjuge também
       let spouse: Member | null = null;
@@ -1151,6 +1156,7 @@ export async function POST(request: Request) {
         isAdmin,
         currentMinistries,
         interestedMinistries,
+        photoUrl,
       } = payload;
 
       const trimmedName = (name || "").trim();
@@ -1229,6 +1235,7 @@ export async function POST(request: Request) {
         interestedMinistries: Array.isArray(interestedMinistries)
           ? interestedMinistries
           : [],
+        photoUrl: photoUrl || undefined,
         registeredAt: todayISO(),
         lastVisitDate: null,
         situation: "bem",

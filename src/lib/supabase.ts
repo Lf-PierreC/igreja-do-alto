@@ -180,6 +180,7 @@ export function mapRowToMember(row: Record<string, any>): Member {
         : Array.isArray(portalData.interestedMinistries)
         ? portalData.interestedMinistries
         : [],
+    photoUrl: row.photo_url || portalData.photoUrl || undefined,
   };
 }
 
@@ -189,6 +190,7 @@ export function mapMemberToRow(m: Member) {
     m.cpf ||
     m.email ||
     m.password ||
+    m.photoUrl ||
     m.isOfficialMember ||
     m.familyId ||
     m.familyRole ||
@@ -206,6 +208,7 @@ export function mapMemberToRow(m: Member) {
       cpf: m.cpf || null,
       email: m.email || null,
       password: m.password || null,
+      photoUrl: m.photoUrl || null,
       isOfficialMember: m.isOfficialMember ?? true,
       familyId: m.familyId || null,
       familyRole: m.familyRole || null,
@@ -247,6 +250,7 @@ export function mapMemberToRow(m: Member) {
     follow_up_responsible: m.followUpResponsible ?? null,
     leadership_alert: m.leadershipAlert ?? null,
     notes: finalNotes,
+    photo_url: m.photoUrl ?? null,
     // Colunas diretas do Portal do Membro & Núcleo Familiar
     cpf: m.cpf ?? null,
     email: m.email ?? null,
