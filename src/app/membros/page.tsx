@@ -4769,7 +4769,7 @@ export default function PortalDoMembroPage() {
                                   A entrada no ministério de Louvor é realizada mediante uma <strong>agenda prévia estabelecida de audições da Igreja do Alto</strong>.
                                 </p>
                                 <p className="text-amber-900/90 text-[11px]">
-                                  A igreja realiza períodos específicos de audições ao longo do ano (não temos datas fixas contínuas e as audições não são feitas de forma imediata). Ao manifestar seu interesse aqui, seu nome e contato ficam registrados em nosso banco de talentos e a liderança do Louvor entrará em contato quando o próximo ciclo oficial de audições for aberto!
+                                  A igreja realiza períodos específicos de audições ao longo do ano (não temos datas fixas contínuas). Ao manifestar seu interesse aqui, seu nome e contato ficam registrados em nosso banco de talentos e a liderança do Louvor entrará em contato quando o próximo ciclo oficial de audições for aberto!
                                 </p>
                               </div>
                             </div>
