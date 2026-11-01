@@ -307,13 +307,16 @@ export default function PortalDoMembroPage() {
   const [addMemPhotoUrl, setAddMemPhotoUrl] = useState("");
   const [isCompressingPhotoAddMem, setIsCompressingPhotoAddMem] = useState(false);
   const [addMemIsPastor, setAddMemIsPastor] = useState(false);
+  const [addMemIsLeader, setAddMemIsLeader] = useState(false);
   const [addMemIsAdmin, setAddMemIsAdmin] = useState(false);
   const [isSavingAddMember, setIsSavingAddMember] = useState(false);
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
 
-  // Nomeação Rápida de Pastor (Aba Gestão de Pastores)
+  // Nomeação Rápida de Equipe (Aba Gestão de Equipe)
   const [selectedMemberToAppoint, setSelectedMemberToAppoint] = useState("");
   const [appointSearchQuery, setAppointSearchQuery] = useState("");
+  const [appointAsPastor, setAppointAsPastor] = useState(false);
+  const [appointAsLeader, setAppointAsLeader] = useState(false);
   const [appointAsAdmin, setAppointAsAdmin] = useState(false);
   const [isAppointing, setIsAppointing] = useState(false);
 
@@ -1225,6 +1228,7 @@ export default function PortalDoMembroPage() {
             password: addMemPassword.trim() || "igrejadoalto",
             photoUrl: addMemPhotoUrl || undefined,
             isPastor: Boolean(addMemIsPastor),
+            isLeader: Boolean(addMemIsLeader),
             isAdmin: Boolean(addMemIsAdmin),
           },
         }),
@@ -1256,6 +1260,7 @@ export default function PortalDoMembroPage() {
       setAddMemPassword("igrejadoalto");
       setAddMemCurrentMinistries([]);
       setAddMemIsPastor(false);
+      setAddMemIsLeader(false);
       setAddMemIsAdmin(false);
     } catch (err) {
       setAddMemberError(
@@ -1266,6 +1271,55 @@ export default function PortalDoMembroPage() {
     }
   };
 
+  const handleSetMemberRoles = async (
+    targetMember: {
+      id?: string;
+      memberId?: string;
+      name: string;
+      isPastor?: boolean;
+      isLeader?: boolean;
+      isAdmin?: boolean;
+      isVisitorActive?: boolean;
+    },
+    roles: {
+      isPastor?: boolean;
+      isLeader?: boolean;
+      isAdmin?: boolean;
+      isVisitorActive?: boolean;
+    }
+  ) => {
+    if (!session) return;
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ADMIN_SET_MEMBER_ROLES",
+          payload: {
+            memberId: targetMember.id || targetMember.memberId,
+            pastorName: targetMember.name,
+            ...roles,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao atualizar permissões de equipe.");
+      }
+      if (data.allMembers) setAllMembers(data.allMembers);
+      if (data.pastors) setPastorsList(data.pastors);
+      setAdminFeedback({
+        type: "success",
+        text: `Permissões de "${targetMember.name}" atualizadas com sucesso!`,
+      });
+    } catch (err) {
+      setAdminFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao alterar permissão.",
+      });
+    }
+  };
+
   const handleSetMemberPastor = (
     targetMember: Member,
     willBePastor: boolean,
@@ -1273,100 +1327,47 @@ export default function PortalDoMembroPage() {
   ) => {
     if (!session) return;
     const confirmMsg = willBePastor
-      ? `Deseja nomear "${targetMember.name}" como Pastor da Igreja?`
+      ? `Deseja nomear "${targetMember.name}" como Pastor(a) da Igreja?`
       : `Deseja remover a função pastoral de "${targetMember.name}"?`;
 
     setConfirmModal({
       open: true,
-      title: willBePastor ? "Nomear Pastor da Igreja" : "Remover Função Pastoral",
-      subtitle: "Gestão do Corpo Pastoral",
+      title: willBePastor ? "Definir Pastor(a) da Igreja" : "Remover Função Pastoral",
+      subtitle: "Gestão de Equipe",
       message: confirmMsg,
-      confirmText: willBePastor ? "Sim, Nomear Pastor" : "Sim, Remover Função",
+      confirmText: willBePastor ? "Sim, Definir Pastor" : "Sim, Remover Função",
       cancelText: "Cancelar",
       isDestructive: !willBePastor,
       onConfirm: async () => {
-        try {
-          const res = await fetch("/api/membros", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "ADMIN_SET_MEMBER_PASTOR",
-              payload: {
-                memberId: targetMember.id,
-                pastorName: targetMember.name,
-                isPastor: willBePastor,
-                isAdmin: Boolean(willBeAdmin),
-              },
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || "Erro ao atualizar permissão pastoral.");
-          }
-          if (data.allMembers) setAllMembers(data.allMembers);
-          if (data.pastors) setPastorsList(data.pastors);
-          setAdminFeedback({
-            type: "success",
-            text: willBePastor
-              ? `"${targetMember.name}" agora é Pastor da Igreja!`
-              : `Função pastoral removida de "${targetMember.name}".`,
-          });
-        } catch (err) {
-          setAdminFeedback({
-            type: "error",
-            text: err instanceof Error ? err.message : "Erro ao alterar permissão.",
-          });
-        }
+        await handleSetMemberRoles(targetMember, {
+          isPastor: willBePastor,
+          ...(willBeAdmin !== undefined ? { isAdmin: willBeAdmin } : {}),
+        });
       },
     });
   };
 
   const handleTogglePastorAccess = async (pastor: PastorLeader) => {
-    const nextRole = pastor.accessRole === "admin" ? "pastor" : "admin";
-    try {
-      const res = await fetch("/api/membros", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "ADMIN_TOGGLE_PASTOR_ACCESS",
-          payload: {
-            pastorId: pastor.id,
-            accessRole: nextRole,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao alternar nível de acesso.");
-      }
-      if (data.pastors) setPastorsList(data.pastors);
-      if (data.allMembers) setAllMembers(data.allMembers);
-      setAdminFeedback({
-        type: "success",
-        text: `Acesso de "${pastor.name}" alterado para ${
-          nextRole === "admin" ? "Admin Total" : "Pastor"
-        }.`,
-      });
-    } catch (err) {
-      setAdminFeedback({
-        type: "error",
-        text: err instanceof Error ? err.message : "Erro ao alterar acesso.",
-      });
-    }
+    const nextIsAdmin = pastor.accessRole !== "admin";
+    await handleSetMemberRoles(pastor, { isAdmin: nextIsAdmin });
   };
 
-  const handleDemotePastor = (pastor: PastorLeader) => {
+  const handleRemoveFromTeam = (target: {
+    id?: string;
+    memberId?: string;
+    name: string;
+  }) => {
     if (
       session &&
-      (session.id === pastor.memberId ||
-        (pastor.id.startsWith("pas-") && pastor.id === `pas-${session.id}`) ||
-        session.name.toLowerCase() === pastor.name.toLowerCase())
+      (session.id === target.memberId ||
+        session.id === target.id ||
+        session.name.toLowerCase() === target.name.toLowerCase())
     ) {
       setAlertModal({
         open: true,
         title: "Ação Não Permitida",
         message:
-          "Você não pode remover seu próprio acesso administrativo/pastoral por motivos de segurança.",
+          "Você não pode remover seu próprio acesso administrativo por motivos de segurança.",
         type: "warning",
       });
       return;
@@ -1374,50 +1375,24 @@ export default function PortalDoMembroPage() {
 
     setConfirmModal({
       open: true,
-      title: "Remover Função Pastoral",
-      subtitle: "Gestão do Corpo Pastoral",
-      message: `Deseja realmente remover a função pastoral de "${pastor.name}"? A pessoa voltará a ter acesso comum como membro.`,
-      confirmText: "Sim, Remover Pastor",
+      title: "Remover da Equipe",
+      subtitle: "Gestão de Equipe",
+      message: `Deseja realmente remover "${target.name}" da equipe? A pessoa voltará a ter apenas perfil comum de membro.`,
+      confirmText: "Sim, Remover da Equipe",
       cancelText: "Cancelar",
       isDestructive: true,
       onConfirm: async () => {
-        try {
-          const res = await fetch("/api/membros", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "ADMIN_SET_MEMBER_PASTOR",
-              payload: {
-                pastorId: pastor.id,
-                memberId:
-                  pastor.memberId ||
-                  (pastor.id.startsWith("pas-")
-                    ? pastor.id.replace(/^pas-/, "")
-                    : undefined),
-                pastorName: pastor.name,
-                isPastor: false,
-                isAdmin: false,
-              },
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || "Erro ao remover função pastoral.");
-          }
-          if (data.pastors) setPastorsList(data.pastors);
-          if (data.allMembers) setAllMembers(data.allMembers);
-          setAdminFeedback({
-            type: "success",
-            text: `Função pastoral removida com sucesso de "${pastor.name}".`,
-          });
-        } catch (err) {
-          setAdminFeedback({
-            type: "error",
-            text: err instanceof Error ? err.message : "Erro ao remover pastor.",
-          });
-        }
+        await handleSetMemberRoles(target, {
+          isPastor: false,
+          isLeader: false,
+          isAdmin: false,
+        });
       },
     });
+  };
+
+  const handleDemotePastor = (pastor: PastorLeader) => {
+    handleRemoveFromTeam(pastor);
   };
 
   const handleQuickAppointPastor = async (e: React.FormEvent) => {
@@ -1428,13 +1403,11 @@ export default function PortalDoMembroPage() {
       target =
         allMembers.find(
           (m) =>
-            !m.isPastor &&
             m.id !== "admin-master" &&
             m.name.toLowerCase() === q
         ) ||
         allMembers.find(
           (m) =>
-            !m.isPastor &&
             m.id !== "admin-master" &&
             m.name.toLowerCase().includes(q)
         );
@@ -1445,7 +1418,18 @@ export default function PortalDoMembroPage() {
         open: true,
         title: "Membro Não Selecionado",
         message:
-          "Por favor, selecione ou digite o nome de um membro cadastrado na plataforma para nomear como pastor.",
+          "Por favor, selecione ou digite o nome de um membro cadastrado na plataforma para definir as funções.",
+        type: "warning",
+      });
+      return;
+    }
+
+    if (!appointAsPastor && !appointAsLeader && !appointAsAdmin) {
+      setAlertModal({
+        open: true,
+        title: "Nenhuma Função Selecionada",
+        message:
+          "Selecione ao menos uma função (Pastor, Líder ou Administrador) para salvar.",
         type: "warning",
       });
       return;
@@ -1453,9 +1437,15 @@ export default function PortalDoMembroPage() {
 
     setIsAppointing(true);
     try {
-      await handleSetMemberPastor(target, true, appointAsAdmin);
+      await handleSetMemberRoles(target, {
+        isPastor: appointAsPastor,
+        isLeader: appointAsLeader,
+        isAdmin: appointAsAdmin,
+      });
       setSelectedMemberToAppoint("");
       setAppointSearchQuery("");
+      setAppointAsPastor(false);
+      setAppointAsLeader(false);
       setAppointAsAdmin(false);
     } finally {
       setIsAppointing(false);
@@ -1472,8 +1462,8 @@ export default function PortalDoMembroPage() {
         id: session.isAdmin ? "master-admin" : session.id,
         name: session.name,
         username: session.cpf || session.name.toLowerCase().replace(/\s+/g, "."),
-        role: session.isAdmin ? "admin" : "pastor",
-        accessRole: session.isAdmin ? "admin" : "pastor",
+        role: session.isAdmin ? "admin" : session.isLeader ? "lider" : "pastor",
+        accessRole: session.isAdmin ? "admin" : session.isLeader ? "lider" : "pastor",
         isMasterAdmin: Boolean(session.isAdmin),
       };
       window.localStorage.setItem(
@@ -2242,9 +2232,14 @@ export default function PortalDoMembroPage() {
     );
   });
 
-  // Membros elegíveis para nomeação como pastor (não pastores)
+  // Membros da equipe (Pastor, Líder ou Admin)
+  const teamMembersList = allMembers.filter(
+    (m) => Boolean(m.isPastor || m.isLeader || m.isAdmin)
+  );
+
+  // Membros para seleção de permissões
   const eligibleMembersToAppoint = allMembers.filter(
-    (m) => !m.isPastor && m.id !== "admin-master"
+    (m) => m.id !== "admin-master"
   );
   const matchingMembersToAppoint = eligibleMembersToAppoint.filter((m) => {
     const q = appointSearchQuery.toLowerCase().trim();
@@ -2289,16 +2284,20 @@ export default function PortalDoMembroPage() {
                   <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider">
                     🤝 Pastor
                   </span>
+                ) : session.isLeader ? (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-black uppercase tracking-wider">
+                    ⭐ Líder
+                  </span>
                 ) : null}
               </div>
             </div>
 
-            {(session.isAdmin || session.isPastor) && (
+            {(session.isAdmin || session.isPastor || session.isLeader) && (
               <button
                 type="button"
                 onClick={() => handleOpenVisitsPortal("agenda")}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3D3D3D] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
-                title="Abrir o Portal Pastoral de Visitas"
+                title="Abrir o Portal de Visitas"
               >
                 <ClipboardCheck className="w-3.5 h-3.5 text-[#EBD57B]" />
                 <span>Portal de Visitas</span>
@@ -2347,7 +2346,7 @@ export default function PortalDoMembroPage() {
               });
               tabs.push({
                 id: "gestao-pastores",
-                label: `Gestão de Equipe (${pastorsList.length})`,
+                label: `Gestão de Equipe (${teamMembersList.length})`,
                 icon: Crown,
               });
             }
@@ -4855,7 +4854,7 @@ export default function PortalDoMembroPage() {
         )}
 
         {/* ===================================================================
-            ABA 6: GESTÃO DE PASTORES (Exclusivo para Admin)
+            ABA 6: GESTÃO DE EQUIPE (Exclusivo para Admin)
            =================================================================== */}
         {activeTab === "gestao-pastores" && session?.isAdmin && (
           <div className="space-y-6">
@@ -4864,14 +4863,14 @@ export default function PortalDoMembroPage() {
               <div className="space-y-1.5 max-w-2xl">
                 <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
                   <Crown className="w-4 h-4" />
-                  Corpo Pastoral & Acessos Administrativos
+                  Corpo Pastoral, Liderança & Administração
                 </span>
                 <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
-                  Gestão de Equipe Pastoral ({pastorsList.length})
+                  Gestão de Equipe & Acessos ({teamMembersList.length})
                 </h2>
                 <p className="text-xs sm:text-sm text-[#DCDACF]/80 leading-relaxed">
-                  Defina quais membros atuam como pastores e conceda privilégios de{" "}
-                  <strong>Admin Total</strong> para os líderes responsáveis pela igreja.
+                  Defina e gerencie quem atua como <strong>Pastor(a)</strong>, <strong>Líder</strong> ou{" "}
+                  <strong>Administrador(a)</strong> de forma totalmente independente.
                 </p>
               </div>
 
@@ -4885,12 +4884,12 @@ export default function PortalDoMembroPage() {
               </button>
             </div>
 
-            {/* Card: Nomear Novo Pastor a partir de Membro Existente */}
+            {/* Card: Nomear ou Alterar Funções na Equipe */}
             <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/15 space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-[#252525]/15">
                 <ShieldCheck className="w-5 h-5 text-[#CB4B3B]" />
                 <h3 className="text-base font-black uppercase text-[#252525]">
-                  Nomear Membro como Pastor
+                  Nomear ou Alterar Funções de Membro
                 </h3>
               </div>
 
@@ -4898,7 +4897,7 @@ export default function PortalDoMembroPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-2 space-y-2">
                     <label className="block text-xs font-black uppercase tracking-wider text-[#252525]">
-                      Localize ou Digite o Nome do Membro *
+                      Localize ou Selecione o Membro *
                     </label>
 
                     {/* SE JÁ HÁ UM MEMBRO SELECIONADO: Mostra card do membro com botão de trocar */}
@@ -4916,6 +4915,21 @@ export default function PortalDoMembroPage() {
                               <span className="px-2 py-0.5 rounded-md bg-emerald-200 text-emerald-950 text-[10px] font-black uppercase tracking-wider">
                                 {selectedMemberObj.relationship || "Membro"}
                               </span>
+                              {selectedMemberObj.isPastor && (
+                                <span className="px-2 py-0.5 rounded-md bg-[#252525] text-white text-[10px] font-bold">
+                                  Pastor
+                                </span>
+                              )}
+                              {selectedMemberObj.isLeader && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold">
+                                  Líder
+                                </span>
+                              )}
+                              {selectedMemberObj.isAdmin && (
+                                <span className="px-2 py-0.5 rounded-md bg-[#CB4B3B] text-white text-[10px] font-bold">
+                                  Admin
+                                </span>
+                              )}
                             </div>
                             <span className="block text-xs text-[#252525]/70 truncate mt-0.5">
                               {selectedMemberObj.phone
@@ -4978,7 +4992,7 @@ export default function PortalDoMembroPage() {
                                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-white text-xs font-black uppercase tracking-wider transition-colors shadow"
                                 >
                                   <UserPlus className="w-3.5 h-3.5" />
-                                  <span>Cadastrar &ldquo;{appointSearchQuery.trim()}&rdquo; como Novo Membro & Pastor</span>
+                                  <span>Cadastrar &ldquo;{appointSearchQuery.trim()}&rdquo; como Novo Membro</span>
                                 </button>
                               </div>
                             ) : (
@@ -4989,6 +5003,9 @@ export default function PortalDoMembroPage() {
                                   onClick={() => {
                                     setSelectedMemberToAppoint(m.id);
                                     setAppointSearchQuery("");
+                                    setAppointAsPastor(Boolean(m.isPastor));
+                                    setAppointAsLeader(Boolean(m.isLeader));
+                                    setAppointAsAdmin(Boolean(m.isAdmin));
                                   }}
                                   className="w-full p-3 text-left hover:bg-[#F4F3EE] flex items-center justify-between gap-3 transition-colors group"
                                 >
@@ -5021,8 +5038,15 @@ export default function PortalDoMembroPage() {
                             <select
                               value={selectedMemberToAppoint}
                               onChange={(e) => {
-                                setSelectedMemberToAppoint(e.target.value);
+                                const val = e.target.value;
+                                setSelectedMemberToAppoint(val);
                                 setAppointSearchQuery("");
+                                const m = allMembers.find((mem) => mem.id === val);
+                                if (m) {
+                                  setAppointAsPastor(Boolean(m.isPastor));
+                                  setAppointAsLeader(Boolean(m.isLeader));
+                                  setAppointAsAdmin(Boolean(m.isAdmin));
+                                }
                               }}
                               className="w-full rounded-xl border-2 border-[#252525]/20 bg-white px-3 py-2 text-xs font-bold text-[#252525]"
                             >
@@ -5041,27 +5065,54 @@ export default function PortalDoMembroPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-col justify-end space-y-3">
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border-2 border-[#252525]/20 bg-white cursor-pointer hover:border-[#CB4B3B] transition-colors">
+                  <div className="flex flex-col justify-end space-y-2">
+                    <span className="text-[11px] font-black uppercase text-[#252525]/70">
+                      Funções Atribuídas:
+                    </span>
+                    <label className="flex items-center gap-2 p-2 rounded-xl border border-[#252525]/20 bg-white cursor-pointer hover:border-[#CB4B3B] transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={appointAsPastor}
+                        onChange={(e) => setAppointAsPastor(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
+                      />
+                      <span className="text-xs font-bold text-[#252525]">
+                        🤝 Pastor(a) da Igreja
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-xl border border-[#252525]/20 bg-white cursor-pointer hover:border-amber-500 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={appointAsLeader}
+                        onChange={(e) => setAppointAsLeader(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-xs font-bold text-amber-900">
+                        ⭐ Líder de Ministério
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-xl border border-[#252525]/20 bg-white cursor-pointer hover:border-[#CB4B3B] transition-colors">
                       <input
                         type="checkbox"
                         checked={appointAsAdmin}
                         onChange={(e) => setAppointAsAdmin(e.target.checked)}
                         className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
                       />
-                      <span className="text-xs font-black uppercase text-[#252525]">
-                        👑 Acesso Admin Total
+                      <span className="text-xs font-bold text-[#CB4B3B]">
+                        👑 Administrador(a) Total
                       </span>
                     </label>
 
                     <button
                       type="submit"
                       disabled={(!selectedMemberToAppoint && !appointSearchQuery.trim()) || isAppointing}
-                      className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider shadow transition-colors"
+                      className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider shadow transition-colors mt-1"
                     >
                       <ShieldCheck className="w-4 h-4" />
                       <span>
-                        {isAppointing ? "Nomeando..." : "Confirmar Nomeação como Pastor"}
+                        {isAppointing ? "Salvando..." : "Salvar Permissões de Equipe"}
                       </span>
                     </button>
                   </div>
@@ -5069,36 +5120,53 @@ export default function PortalDoMembroPage() {
               </form>
             </div>
 
-            {/* Lista dos Pastores Atuais */}
+            {/* Lista da Equipe Atual */}
             <div className="space-y-3">
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#252525]/70">
-                Pastores e Administradores em Atividade ({pastorsList.length})
+                Equipe Pastoral, Liderança e Administração em Atividade ({teamMembersList.length})
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pastorsList.map((p) => {
-                  const isAdmin = p.accessRole === "admin";
+                {teamMembersList.map((m) => {
                   return (
                     <div
-                      key={p.id}
-                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-4"
+                      key={m.id}
+                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-base font-black text-[#252525]">{p.name}</h4>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                isAdmin
-                                  ? "bg-[#CB4B3B] text-white"
-                                  : "bg-[#252525] text-[#DCDACF]"
-                              }`}
-                            >
-                              {isAdmin ? "👑 Admin Total" : "🤝 Pastor"}
-                            </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-base font-black text-[#252525]">{m.name}</h4>
+                            {m.isPastor && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#252525] text-[#DCDACF]">
+                                🤝 Pastor(a)
+                              </span>
+                            )}
+                            {m.isLeader && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white">
+                                ⭐ Líder
+                              </span>
+                            )}
+                            {m.isAdmin && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#CB4B3B] text-white">
+                                👑 Admin
+                              </span>
+                            )}
                           </div>
-                          <span className="text-xs font-bold text-[#252525]/60">
-                            {p.role || "Pastores"} • {p.phone || "Sem telefone"}
+                          <span className="text-xs font-bold text-[#252525]/60 block mt-1">
+                            {m.phone ? formatPhoneBR(m.phone) : m.email || "Sem telefone"}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              m.isVisitorActive !== false
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-stone-200 text-stone-600"
+                            }`}
+                          >
+                            {m.isVisitorActive !== false ? "🟢 Visitador Ativo" : "⚪ Visitador Inativo"}
                           </span>
                         </div>
                       </div>
@@ -5106,29 +5174,60 @@ export default function PortalDoMembroPage() {
                       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#252525]/80 bg-[#F4F3EE] p-2.5 rounded-xl">
                         <span className="inline-flex items-center gap-1">
                           <KeyRound className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                          Login de acesso: <strong>{p.username || "pastor"}</strong>
+                          Login de acesso: <strong>{m.cpf ? formatCPF(m.cpf) : m.email || m.name}</strong>
                         </span>
                       </div>
 
+                      {/* Botões de Ação Rápida para Alternar Funções de Forma Independente */}
                       <div className="pt-2 border-t border-[#252525]/10 flex flex-wrap items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePastorAccess(p)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
-                            isAdmin
-                              ? "bg-white text-[#252525] border border-[#252525]/25 hover:bg-[#DCDACF]"
-                              : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
-                          }`}
-                        >
-                          {isAdmin ? "Mudar p/ Pastor" : "👑 Tornar Admin Total"}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSetMemberRoles(m, { isPastor: !m.isPastor })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase transition-colors ${
+                              m.isPastor
+                                ? "bg-stone-200 text-[#252525] hover:bg-stone-300"
+                                : "bg-[#252525] text-white hover:bg-black"
+                            }`}
+                            title="Alternar função de Pastor"
+                          >
+                            {m.isPastor ? "✕ Tirar Pastor" : "+ Pastor"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSetMemberRoles(m, { isLeader: !m.isLeader })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase transition-colors ${
+                              m.isLeader
+                                ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                                : "bg-amber-600 text-white hover:bg-amber-700"
+                            }`}
+                            title="Alternar função de Líder"
+                          >
+                            {m.isLeader ? "✕ Tirar Líder" : "+ Líder"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSetMemberRoles(m, { isAdmin: !m.isAdmin })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase transition-colors ${
+                              m.isAdmin
+                                ? "bg-red-100 text-red-900 border border-red-300 hover:bg-red-200"
+                                : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
+                            }`}
+                            title="Alternar privilégio de Administrador"
+                          >
+                            {m.isAdmin ? "✕ Tirar Admin" : "👑 + Admin"}
+                          </button>
+                        </div>
 
                         <button
                           type="button"
-                          onClick={() => handleDemotePastor(p)}
-                          className="px-3 py-1.5 rounded-xl bg-[#F9EAE8] hover:bg-[#CB4B3B] text-[#CB4B3B] hover:text-white text-xs font-bold uppercase transition-colors"
+                          onClick={() => handleRemoveFromTeam(m)}
+                          className="px-2.5 py-1 rounded-lg bg-[#F9EAE8] hover:bg-[#CB4B3B] text-[#CB4B3B] hover:text-white text-[11px] font-bold uppercase transition-colors"
+                          title="Remover todas as permissões especiais deste membro"
                         >
-                          Remover Pastor
+                          Remover da Equipe
                         </button>
                       </div>
                     </div>
@@ -5531,41 +5630,48 @@ export default function PortalDoMembroPage() {
             </span>
           </div>
 
-          {/* Se Admin: opção de promover diretamente a Pastor ou Admin */}
+          {/* Se Admin: opção de definir funções especiais de forma independente */}
           {session?.isAdmin && (
             <div className="p-3.5 rounded-2xl bg-[#252525] text-[#DCDACF] space-y-2">
               <span className="block text-[11px] font-black uppercase text-[#CB4B3B]">
-                Privilégios Especiais (Administrador)
+                Funções de Equipe & Privilégios (Independentes)
               </span>
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={addMemIsPastor}
-                    onChange={(e) => {
-                      setAddMemIsPastor(e.target.checked);
-                      if (!e.target.checked) setAddMemIsAdmin(false);
-                    }}
+                    onChange={(e) => setAddMemIsPastor(e.target.checked)}
                     className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
                   />
                   <span className="text-xs font-bold">
-                    🤝 Definir como Pastor da Igreja
+                    🤝 Definir como Pastor(a)
                   </span>
                 </label>
 
-                {addMemIsPastor && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={addMemIsAdmin}
-                      onChange={(e) => setAddMemIsAdmin(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
-                    />
-                    <span className="text-xs font-bold text-amber-300">
-                      👑 Conceder Acesso Admin Total
-                    </span>
-                  </label>
-                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={addMemIsLeader}
+                    onChange={(e) => setAddMemIsLeader(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500"
+                  />
+                  <span className="text-xs font-bold text-amber-400">
+                    ⭐ Definir como Líder
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={addMemIsAdmin}
+                    onChange={(e) => setAddMemIsAdmin(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#CB4B3B] focus:ring-[#CB4B3B]"
+                  />
+                  <span className="text-xs font-bold text-red-400">
+                    👑 Acesso Administrador(a) Total
+                  </span>
+                </label>
               </div>
             </div>
           )}
@@ -5961,58 +6067,83 @@ export default function PortalDoMembroPage() {
             </div>
 
             {/* Ações Administrativas (Exclusivo para Admin Master) */}
+            {/* Ações Administrativas (Exclusivo para Admin Master) */}
             {session.isAdmin && (
               <div className="p-4 rounded-2xl bg-[#252525] text-[#DCDACF] space-y-3">
-                <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
-                  Governança & Acessos Pastorais
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="block text-[10px] font-black uppercase text-[#CB4B3B]">
+                    Governança & Acessos de Equipe
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                    {selectedMemberDetail.isPastor && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-800 text-white">Pastor</span>
+                    )}
+                    {selectedMemberDetail.isLeader && (
+                      <span className="px-2 py-0.5 rounded bg-amber-600 text-white">Líder</span>
+                    )}
+                    {selectedMemberDetail.isAdmin && (
+                      <span className="px-2 py-0.5 rounded bg-[#CB4B3B] text-white">Admin</span>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-2">
-                  {!selectedMemberDetail.isPastor ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await handleSetMemberPastor(selectedMemberDetail, true, false);
-                        setSelectedMemberDetail(null);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-white text-xs font-black uppercase tracking-wider transition-colors shadow"
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Nomear como Pastor</span>
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await handleSetMemberPastor(
-                            selectedMemberDetail,
-                            true,
-                            !selectedMemberDetail.isAdmin
-                          );
-                          setSelectedMemberDetail(null);
-                        }}
-                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
-                          selectedMemberDetail.isAdmin
-                            ? "bg-white text-[#252525] hover:bg-[#DCDACF]"
-                            : "bg-[#CB4B3B] text-white hover:bg-[#A93829]"
-                        }`}
-                      >
-                        {selectedMemberDetail.isAdmin
-                          ? "Rebaixar para Pastor"
-                          : "👑 Tornar Admin Total"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await handleSetMemberPastor(selectedMemberDetail, false, false);
-                          setSelectedMemberDetail(null);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-red-950 text-red-300 hover:bg-red-900 text-xs font-bold transition-colors"
-                      >
-                        Remover Pastor
-                      </button>
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !selectedMemberDetail.isPastor;
+                      await handleSetMemberRoles(selectedMemberDetail, { isPastor: next });
+                      setSelectedMemberDetail({ ...selectedMemberDetail, isPastor: next });
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow ${
+                      selectedMemberDetail.isPastor
+                        ? "bg-stone-700 text-stone-200 hover:bg-stone-600"
+                        : "bg-emerald-700 hover:bg-emerald-600 text-white"
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedMemberDetail.isPastor ? "Remover Pastor" : "Tornar Pastor"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !selectedMemberDetail.isLeader;
+                      await handleSetMemberRoles(selectedMemberDetail, { isLeader: next });
+                      setSelectedMemberDetail({ ...selectedMemberDetail, isLeader: next });
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow ${
+                      selectedMemberDetail.isLeader
+                        ? "bg-stone-700 text-stone-200 hover:bg-stone-600"
+                        : "bg-amber-600 hover:bg-amber-500 text-white"
+                    }`}
+                  >
+                    <Star className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedMemberDetail.isLeader ? "Remover Líder" : "Tornar Líder"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !selectedMemberDetail.isAdmin;
+                      await handleSetMemberRoles(selectedMemberDetail, { isAdmin: next });
+                      setSelectedMemberDetail({ ...selectedMemberDetail, isAdmin: next });
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow ${
+                      selectedMemberDetail.isAdmin
+                        ? "bg-stone-700 text-stone-200 hover:bg-stone-600"
+                        : "bg-[#CB4B3B] hover:bg-[#A93829] text-white"
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedMemberDetail.isAdmin ? "Remover Admin" : "Tornar Admin"}
+                    </span>
+                  </button>
                 </div>
               </div>
             )}

@@ -302,11 +302,17 @@ export function SolicitacoesQueueTab({
                       className="w-full sm:w-auto max-w-full min-w-0 truncate rounded-xl border border-[#252525]/25 bg-white px-3 py-2 text-xs font-bold"
                     >
                       <option value="">— Selecionar Visitador —</option>
-                      {db.pastors.map((p) => (
-                        <option key={p.id} value={p.name}>
-                          {p.name}
-                        </option>
-                      ))}
+                      {db.pastors
+                        .filter(
+                          (p) =>
+                            p.isVisitorActive !== false ||
+                            p.name === req.assignedPastor
+                        )
+                        .map((p) => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
                     </select>
                   ) : (
                     <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-[#252525] text-[#DCDACF] text-xs font-black">
@@ -575,11 +581,17 @@ export function SolicitacoesQueueTab({
                     className="rounded-xl border border-[#252525]/25 bg-white px-3 py-1.5 text-xs font-bold"
                   >
                     <option value="">— Selecionar Visitador —</option>
-                    {db.pastors.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
+                    {db.pastors
+                      .filter(
+                        (p) =>
+                          p.isVisitorActive !== false ||
+                          p.name === selectedRequestDetails.assignedPastor
+                      )
+                      .map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}

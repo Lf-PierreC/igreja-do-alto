@@ -82,6 +82,8 @@ export interface MemberSession {
   portalRole?: "membro" | "pastor" | "admin";
   isPastor?: boolean;
   isAdmin?: boolean;
+  isLeader?: boolean;
+  isVisitorActive?: boolean;
 }
 
 /** Cadastro da pessoa/família (alimentado pela solicitação, portal do membro e pelos relatórios). */
@@ -129,10 +131,12 @@ export interface Member {
   currentMinistries?: string[]; // Ministérios em que a pessoa já serve atualmente
   interestedMinistries?: string[]; // Ministérios/áreas em que a pessoa tem interesse em servir
 
-  // Permissões pastorais e administrativas
+  // Permissões pastorais, de liderança e administrativas
   portalRole?: "membro" | "pastor" | "admin";
   isPastor?: boolean;
   isAdmin?: boolean;
+  isLeader?: boolean;
+  isVisitorActive?: boolean;
 
   // Foto do Membro
   photoUrl?: string;
@@ -222,7 +226,7 @@ export interface VisitReport {
   createdAt: string;
 }
 
-export type UserAccessRole = "admin" | "pastor";
+export type UserAccessRole = "admin" | "pastor" | "lider";
 
 export interface PastorLeader {
   id: string;
@@ -234,6 +238,7 @@ export interface PastorLeader {
   password?: string;
   accessRole?: UserAccessRole;
   memberId?: string;
+  isVisitorActive?: boolean;
 }
 
 export interface DatabaseSchema {

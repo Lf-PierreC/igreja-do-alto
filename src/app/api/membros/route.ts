@@ -6,12 +6,14 @@ import {
   FamilyDependent,
   Member,
   PastorLeader,
+  UserAccessRole,
   VisitRequest,
 } from "@/types/visitas";
 import { INITIAL_DATA } from "@/data/initialData";
 import {
   getSupabaseClient,
   fetchDatabaseFromSupabase,
+  deriveDefaultUsername,
   mapMemberToRow,
   mapPastorToRow,
   mapRequestToRow,
@@ -254,6 +256,7 @@ export async function GET(request: Request) {
     const isPastorOrAdmin = Boolean(
       member.isPastor ||
       member.isAdmin ||
+      member.isLeader ||
       member.portalRole === "pastor" ||
       member.portalRole === "admin" ||
       db.pastors.some(
@@ -625,10 +628,10 @@ export async function POST(request: Request) {
 
       const isPastor = Boolean(
         targetMember.isPastor ||
-          matchedPastor ||
-          targetMember.portalRole === "pastor" ||
-          targetMember.portalRole === "admin"
+          (matchedPastor && matchedPastor.role === "Pastores") ||
+          targetMember.portalRole === "pastor"
       );
+      const isLeader = Boolean(targetMember.isLeader);
       const isAdmin = Boolean(
         targetMember.isAdmin ||
           matchedPastor?.accessRole === "admin" ||
@@ -641,6 +644,7 @@ export async function POST(request: Request) {
         : "membro";
 
       targetMember.isPastor = isPastor;
+      targetMember.isLeader = isLeader;
       targetMember.isAdmin = isAdmin;
       targetMember.portalRole = portalRole;
 
@@ -653,16 +657,18 @@ export async function POST(request: Request) {
         familyId: targetMember.familyId,
         portalRole,
         isPastor,
+        isLeader,
         isAdmin,
+        isVisitorActive: targetMember.isVisitorActive !== false,
       };
 
       return NextResponse.json({
         ok: true,
         session,
         member: targetMember,
-        allMembers: isPastor || isAdmin ? db.members : undefined,
-        pastors: isPastor || isAdmin ? db.pastors : undefined,
-        reports: isPastor || isAdmin ? db.reports : undefined,
+        allMembers: isPastor || isLeader || isAdmin ? db.members : undefined,
+        pastors: isPastor || isLeader || isAdmin ? db.pastors : undefined,
+        reports: isPastor || isLeader || isAdmin ? db.reports : undefined,
       });
     }
 
@@ -1344,34 +1350,42 @@ export async function POST(request: Request) {
       });
     }
 
-    // 8. ADMIN: DEFINIR / REMOVER MEMBRO COMO PASTOR
-    if (action === "ADMIN_SET_MEMBER_PASTOR") {
-      const { memberId, pastorId, pastorName, isPastor, isAdmin } = payload as {
+    // 8. ADMIN: DEFINIR / REMOVER MEMBRO COMO PASTOR, LÍDER OU ADMIN (INDEPENDENTES)
+    if (action === "ADMIN_SET_MEMBER_ROLES" || action === "ADMIN_SET_MEMBER_PASTOR") {
+      const {
+        memberId,
+        pastorId,
+        pastorName,
+        isPastor,
+        isLeader,
+        isAdmin,
+        isVisitorActive,
+      } = payload as {
         memberId?: string;
         pastorId?: string;
         pastorName?: string;
-        isPastor: boolean;
+        isPastor?: boolean;
+        isLeader?: boolean;
         isAdmin?: boolean;
+        isVisitorActive?: boolean;
       };
 
-      const willBePastor = Boolean(isPastor);
-      const willBeAdmin = willBePastor && Boolean(isAdmin);
+      // Encontra o membro correspondente na lista de membros
+      let member = db.members.find(
+        (m) =>
+          (memberId && m.id === memberId) ||
+          (pastorId && (m.id === pastorId || m.id === pastorId.replace(/^pas-/, ""))) ||
+          (pastorName && m.name.toLowerCase() === pastorName.trim().toLowerCase())
+      );
 
       // Encontra o pastor na lista de pastores
       let pastor = db.pastors.find(
         (p) =>
           (pastorId && p.id === pastorId) ||
           (memberId && (p.memberId === memberId || p.id === `pas-${memberId}`)) ||
-          (pastorName && p.name.toLowerCase() === pastorName.trim().toLowerCase())
-      );
-
-      // Encontra o membro correspondente na lista de membros
-      let member = db.members.find(
-        (m) =>
-          (memberId && m.id === memberId) ||
-          (pastor?.memberId && m.id === pastor.memberId) ||
-          (pastor && (m.id === pastor.id.replace(/^pas-/, "") || m.name.toLowerCase() === pastor.name.toLowerCase())) ||
-          (pastorName && m.name.toLowerCase() === pastorName.trim().toLowerCase())
+          (member && (p.memberId === member.id || p.id === `pas-${member.id}`)) ||
+          (pastorName && p.name.toLowerCase() === pastorName.trim().toLowerCase()) ||
+          (member && p.name.toLowerCase() === member.name.toLowerCase())
       );
 
       if (!member && !pastor) {
@@ -1381,48 +1395,61 @@ export async function POST(request: Request) {
         );
       }
 
-      if (willBePastor) {
-        if (!member) {
-          return NextResponse.json(
-            { error: "Membro não encontrado para nomeação pastoral." },
-            { status: 404 }
-          );
-        }
-        member.isPastor = true;
-        member.isAdmin = willBeAdmin;
-        member.portalRole = willBeAdmin ? "admin" : "pastor";
+      if (!member && pastor) {
+        member = db.members.find((m) => m.name.toLowerCase() === pastor!.name.toLowerCase());
+      }
+
+      if (member) {
+        if (isPastor !== undefined) member.isPastor = Boolean(isPastor);
+        if (isLeader !== undefined) member.isLeader = Boolean(isLeader);
+        if (isAdmin !== undefined) member.isAdmin = Boolean(isAdmin);
+        if (isVisitorActive !== undefined) member.isVisitorActive = Boolean(isVisitorActive);
+
+        member.portalRole = member.isAdmin
+          ? "admin"
+          : member.isPastor
+          ? "pastor"
+          : "membro";
+      }
+
+      const finalIsPastor = Boolean(member?.isPastor);
+      const finalIsLeader = Boolean(member?.isLeader);
+      const finalIsAdmin = Boolean(member?.isAdmin);
+      const hasTeamRole = finalIsPastor || finalIsLeader || finalIsAdmin;
+
+      if (hasTeamRole && member) {
+        const roleTitle = finalIsPastor ? "Pastores" : finalIsLeader ? "Líderes" : "Administração";
+        const accessRole: UserAccessRole = finalIsAdmin ? "admin" : finalIsLeader ? "lider" : "pastor";
+        const visitorActive = member.isVisitorActive !== false;
 
         if (pastor) {
           pastor.memberId = member.id;
-          pastor.accessRole = willBeAdmin ? "admin" : "pastor";
+          pastor.role = roleTitle;
+          pastor.accessRole = accessRole;
+          pastor.isVisitorActive = visitorActive;
           if (member.phone) pastor.phone = member.phone;
         } else {
           const defaultUsername = (
             member.email?.split("@")[0] ||
-            member.name.toLowerCase().replace(/\s+/g, "")
+            deriveDefaultUsername(member.name)
           ).slice(0, 20);
 
           pastor = {
             id: `pas-${member.id}`,
             name: member.name,
-            role: "Pastores",
+            role: roleTitle,
             phone: member.phone || "",
             regionFocus: "Igreja do Alto",
             username: defaultUsername,
             password: member.password || "igrejadoalto",
-            accessRole: willBeAdmin ? "admin" : "pastor",
+            accessRole,
             memberId: member.id,
+            isVisitorActive: visitorActive,
           };
           db.pastors.push(pastor);
         }
-      } else {
-        // REMOVER DA FUNÇÃO PASTORAL
-        if (member) {
-          member.isPastor = false;
-          member.isAdmin = false;
-          member.portalRole = "membro";
-        }
-
+      } else if (!hasTeamRole) {
+        // Remove da tabela pastors se não possui mais nenhum papel de equipe
         const idsToRemove = new Set<string>();
         if (pastorId) idsToRemove.add(pastorId);
         if (pastor?.id) idsToRemove.add(pastor.id);
@@ -1451,36 +1478,78 @@ export async function POST(request: Request) {
               .upsert(mapMemberToRow(member), { onConflict: "id" }).throwOnError();
           }
 
-          if (willBePastor && pastor) {
+          if (hasTeamRole && pastor) {
             await supabase
               .from("pastors")
               .upsert(mapPastorToRow(pastor), { onConflict: "id" }).throwOnError();
-          } else if (!willBePastor) {
-            // Remove do Supabase pastors table
-            if (pastorId) {
-              await supabase.from("pastors").delete().eq("id", pastorId);
-            }
-            if (pastor?.id && pastor.id !== pastorId) {
-              await supabase.from("pastors").delete().eq("id", pastor.id);
-            }
-            if (member?.id) {
-              await supabase.from("pastors").delete().eq("id", `pas-${member.id}`);
-            }
-            if (pastor?.name) {
-              await supabase.from("pastors").delete().eq("name", pastor.name);
-            }
-            if (member?.name && member.name !== pastor?.name) {
-              await supabase.from("pastors").delete().eq("name", member.name);
-            }
+          } else if (!hasTeamRole) {
+            if (pastorId) await supabase.from("pastors").delete().eq("id", pastorId);
+            if (pastor?.id && pastor.id !== pastorId) await supabase.from("pastors").delete().eq("id", pastor.id);
+            if (member?.id) await supabase.from("pastors").delete().eq("id", `pas-${member.id}`);
+            if (pastor?.name) await supabase.from("pastors").delete().eq("name", pastor.name);
           }
         } catch (supaErr) {
-          console.error("Erro ao sincronizar pastor no Supabase:", supaErr);
+          console.error("Erro ao sincronizar papéis no Supabase:", supaErr);
         }
       }
 
       return NextResponse.json({
         ok: true,
         member,
+        allMembers: db.members,
+        pastors: db.pastors,
+      });
+    }
+
+    // 8.1 ADMIN: ATIVAR / DESATIVAR PERFIL COMO VISITADOR
+    if (action === "ADMIN_TOGGLE_VISITOR_ACTIVE" || action === "TOGGLE_VISITOR_ACTIVE") {
+      const { id, memberId, pastorId, isVisitorActive } = payload as {
+        id?: string;
+        memberId?: string;
+        pastorId?: string;
+        isVisitorActive: boolean;
+      };
+
+      const targetId = memberId || pastorId || id;
+      const active = Boolean(isVisitorActive);
+
+      const member = db.members.find(
+        (m) =>
+          m.id === targetId ||
+          (m.cpf && cleanDigits(m.cpf) === cleanDigits(targetId || "")) ||
+          m.name.toLowerCase() === (targetId || "").toLowerCase()
+      );
+
+      const pastor = db.pastors.find(
+        (p) =>
+          p.id === targetId ||
+          (member && p.memberId === member.id) ||
+          p.name.toLowerCase() === (targetId || "").toLowerCase()
+      );
+
+      if (member) member.isVisitorActive = active;
+      if (pastor) pastor.isVisitorActive = active;
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          if (member) {
+            await supabase.from("members").upsert(mapMemberToRow(member), { onConflict: "id" }).throwOnError();
+          }
+          if (pastor) {
+            await supabase.from("pastors").upsert(mapPastorToRow(pastor), { onConflict: "id" }).throwOnError();
+          }
+        } catch (supaErr) {
+          console.error("Erro ao alternar status de visitador no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        isVisitorActive: active,
+        member,
+        pastor,
         allMembers: db.members,
         pastors: db.pastors,
       });
@@ -1555,6 +1624,7 @@ export async function POST(request: Request) {
         activityName,
         password,
         isPastor,
+        isLeader,
         isAdmin,
         currentMinistries,
         interestedMinistries,
@@ -1605,7 +1675,9 @@ export async function POST(request: Request) {
       }
 
       const willBePastor = Boolean(isPastor);
-      const willBeAdmin = willBePastor && Boolean(isAdmin);
+      const willBeLeader = Boolean(isLeader);
+      const willBeAdmin = Boolean(isAdmin);
+      const hasTeamRole = willBePastor || willBeLeader || willBeAdmin;
       const familyId = `fam-${Date.now()}`;
 
       const newMember: Member = {
@@ -1648,28 +1720,42 @@ export async function POST(request: Request) {
         familyRole: "titular",
         dependents: [],
         isPastor: willBePastor,
+        isLeader: willBeLeader,
         isAdmin: willBeAdmin,
-        portalRole: willBePastor ? (willBeAdmin ? "admin" : "pastor") : "membro",
+        isVisitorActive: true,
+        portalRole: willBeAdmin ? "admin" : willBePastor ? "pastor" : "membro",
       };
 
       db.members.unshift(newMember);
 
-      if (willBePastor) {
+      if (hasTeamRole) {
         const defaultUsername = (
           normalizedEmail?.split("@")[0] ||
-          trimmedName.toLowerCase().replace(/\s+/g, "")
+          deriveDefaultUsername(trimmedName)
         ).slice(0, 20);
+
+        const roleTitle = willBePastor
+          ? "Pastores"
+          : willBeLeader
+          ? "Líderes"
+          : "Administração";
+        const accessRole: UserAccessRole = willBeAdmin
+          ? "admin"
+          : willBeLeader
+          ? "lider"
+          : "pastor";
 
         const newPastor: PastorLeader = {
           id: `pas-${newMember.id}`,
           name: newMember.name,
-          role: "Pastores",
+          role: roleTitle,
           phone: newMember.phone || "",
           regionFocus: "Igreja do Alto",
           username: defaultUsername,
           password: newMember.password || "igrejadoalto",
-          accessRole: willBeAdmin ? "admin" : "pastor",
+          accessRole,
           memberId: newMember.id,
+          isVisitorActive: true,
         };
         db.pastors.push(newPastor);
       }
@@ -1681,7 +1767,7 @@ export async function POST(request: Request) {
           await supabase
             .from("members")
             .upsert(mapMemberToRow(newMember), { onConflict: "id" }).throwOnError();
-          if (willBePastor) {
+          if (hasTeamRole) {
             const pastorToSave = db.pastors.find(
               (p) => p.memberId === newMember.id
             );

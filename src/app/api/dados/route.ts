@@ -50,7 +50,13 @@ function normalizePastorsList(pastors: PastorLeader[]): PastorLeader[] {
     ...p,
     username: (p.username || deriveDefaultUsername(p.name)).trim().toLowerCase(),
     password: p.password || "igrejadoalto",
-    accessRole: p.accessRole === "admin" ? "admin" : "pastor",
+    accessRole:
+      p.accessRole === "admin"
+        ? "admin"
+        : p.accessRole === "lider"
+        ? "lider"
+        : "pastor",
+    isVisitorActive: p.isVisitorActive !== undefined ? p.isVisitorActive : true,
   }));
 }
 
@@ -105,15 +111,27 @@ function syncPastorsWithMembers(db: DatabaseSchema): DatabaseSchema {
   );
 
   for (const m of db.members || []) {
-    if (m.isPastor || m.portalRole === "pastor" || m.portalRole === "admin") {
-      if (
-        !existingMemberIds.has(m.id) &&
-        !existingNames.has(m.name.trim().toLowerCase())
-      ) {
+    const isEligible = Boolean(
+      m.isPastor ||
+        m.isLeader ||
+        m.isAdmin ||
+        m.portalRole === "pastor" ||
+        m.portalRole === "admin"
+    );
+
+    if (isEligible) {
+      const existing = currentPastors.find(
+        (p) =>
+          (p.memberId && p.memberId === m.id) ||
+          p.id === `pas-${m.id}` ||
+          p.name.trim().toLowerCase() === m.name.trim().toLowerCase()
+      );
+
+      if (!existing) {
         currentPastors.push({
           id: `pas-${m.id}`,
           name: m.name,
-          role: "Pastores",
+          role: m.isPastor ? "Pastores" : m.isLeader ? "Líderes" : "Administração",
           phone: m.phone || "",
           regionFocus: "Igreja do Alto",
           username: (
@@ -121,11 +139,27 @@ function syncPastorsWithMembers(db: DatabaseSchema): DatabaseSchema {
           ).toLowerCase(),
           password: m.password || "igrejadoalto",
           accessRole:
-            m.isAdmin || m.portalRole === "admin" ? "admin" : "pastor",
+            m.isAdmin || m.portalRole === "admin"
+              ? "admin"
+              : m.isLeader
+              ? "lider"
+              : "pastor",
           memberId: m.id,
+          isVisitorActive:
+            m.isVisitorActive !== undefined ? m.isVisitorActive : true,
         });
         existingMemberIds.add(m.id);
         existingNames.add(m.name.trim().toLowerCase());
+      } else {
+        if (m.isVisitorActive !== undefined) {
+          existing.isVisitorActive = m.isVisitorActive;
+        }
+        existing.accessRole =
+          m.isAdmin || m.portalRole === "admin"
+            ? "admin"
+            : m.isLeader
+            ? "lider"
+            : "pastor";
       }
     }
   }
@@ -242,21 +276,22 @@ export async function POST(request: Request) {
         );
       }
 
-      // Verifica se a pessoa tem perfil pastoral ou admin
-      const isPastorOrAdmin =
+      // Verifica se a pessoa tem perfil pastoral, líder ou admin
+      const isPastorOrLeaderOrAdmin =
         Boolean(matchedPastor) ||
         Boolean(
           matchedMember?.isPastor ||
+            matchedMember?.isLeader ||
             matchedMember?.isAdmin ||
             matchedMember?.portalRole === "pastor" ||
             matchedMember?.portalRole === "admin"
         );
 
-      if (!isPastorOrAdmin) {
+      if (!isPastorOrLeaderOrAdmin) {
         return NextResponse.json(
           {
             error:
-              "Acesso exclusivo para Pastores e Administradores da igreja. Para acessar seu perfil familiar e solicitar visitas, utilize o Portal do Membro.",
+              "Acesso exclusivo para Pastores, Líderes e Administradores da igreja. Para acessar seu perfil familiar e solicitar visitas, utilize o Portal do Membro.",
           },
           { status: 403 }
         );
@@ -290,6 +325,8 @@ export async function POST(request: Request) {
         matchedMember?.isAdmin ||
         matchedMember?.portalRole === "admin"
           ? "admin"
+          : matchedMember?.isLeader
+          ? "lider"
           : "pastor";
 
       const pastorSession = {
@@ -303,6 +340,64 @@ export async function POST(request: Request) {
         ok: true,
         session: pastorSession,
         db,
+      });
+    }
+
+    // 0.1 Ativar / Desativar Perfil como Visitador Ativo
+    if (body.action === "TOGGLE_VISITOR_ACTIVE") {
+      const { id, isVisitorActive } = (body.payload || {}) as {
+        id: string;
+        isVisitorActive: boolean;
+      };
+
+      const active = Boolean(isVisitorActive);
+
+      // Atualiza em db.pastors
+      const pastor = db.pastors.find(
+        (p) =>
+          p.id === id ||
+          p.memberId === id ||
+          p.name.trim().toLowerCase() === id.trim().toLowerCase()
+      );
+      if (pastor) {
+        pastor.isVisitorActive = active;
+      }
+
+      // Atualiza em db.members
+      const member = db.members.find(
+        (m) =>
+          m.id === id ||
+          (pastor && m.id === pastor.memberId) ||
+          m.name.trim().toLowerCase() === id.trim().toLowerCase()
+      );
+      if (member) {
+        member.isVisitorActive = active;
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          if (pastor) {
+            await supabase
+              .from("pastors")
+              .upsert(mapPastorToRow(pastor), { onConflict: "id" });
+          }
+          if (member) {
+            await supabase
+              .from("members")
+              .upsert(mapMemberToRow(member), { onConflict: "id" })
+              .throwOnError();
+          }
+        } catch (supaErr) {
+          console.error("Erro ao alternar status de visitador:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        db,
+        isVisitorActive: active,
       });
     }
 

@@ -36,6 +36,7 @@ import {
   LogOut,
   AlertCircle,
   ShieldCheck,
+  UserCheck,
   Copy,
   Check,
 } from "lucide-react";
@@ -454,6 +455,11 @@ export default function PainelLideresPage() {
           label: `Solicitações (${openRequestsCount})`,
           icon: ClipboardList,
         },
+        {
+          id: "equipe",
+          label: "Gestão de Visitadores",
+          icon: UserCheck,
+        },
       ] as const)
     : ([
         {
@@ -485,7 +491,11 @@ export default function PainelLideresPage() {
               <span className="w-2 h-2 rounded-full bg-[#CB4B3B]" />
               <span>{currentUser.name}</span>
               <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#252525] text-[#CB4B3B] font-black">
-                {isAdmin ? "Admin" : "Pastor"}
+                {currentUser.accessRole === "admin"
+                  ? "Admin"
+                  : currentUser.accessRole === "lider"
+                  ? "Líder"
+                  : "Pastor"}
               </span>
             </span>
 
@@ -607,24 +617,10 @@ export default function PainelLideresPage() {
         )}
 
         {isAdmin && activeTab === "equipe" && (
-          <div className="p-8 rounded-3xl bg-white border border-[#252525]/15 text-center space-y-4 max-w-xl mx-auto shadow-sm my-6">
-            <ShieldCheck className="w-12 h-12 text-[#CB4B3B] mx-auto" />
-            <h3 className="text-xl font-black text-[#252525]">
-              Gestão de Pastores & Equipe
-            </h3>
-            <p className="text-xs sm:text-sm text-[#252525]/75 leading-relaxed">
-              A nomeação de pastores e a gestão de permissões administrativas agora é realizada de forma integrada e centralizada no <strong>Portal de Membros</strong>.
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/membros"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-white font-black text-xs uppercase tracking-wider shadow transition-colors"
-              >
-                <span>Acessar Gestão no Portal de Membros</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
+          <EquipeAcessosTab
+            db={db}
+            onDbUpdated={(updatedDb) => setDb(updatedDb)}
+          />
         )}
       </main>
 

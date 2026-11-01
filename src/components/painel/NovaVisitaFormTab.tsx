@@ -538,7 +538,11 @@ export function NovaVisitaFormTab({
 
   const selectedMemberObj = db.members.find((m) => m.id === selectedMemberId);
 
-  const visitorChoices = [...db.pastors.map((p) => p.name), OTHER_LEADER];
+  const activeVisitors = db.pastors
+    .filter((p) => p.isVisitorActive !== false)
+    .map((p) => p.name);
+
+  const visitorChoices = [...activeVisitors, OTHER_LEADER];
 
   if (submittedInfo) {
     return (
@@ -1828,9 +1832,11 @@ export function NovaVisitaFormTab({
                 className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 font-medium"
               />
               <datalist id="pastors-datalist">
-                {db.pastors.map((p) => (
-                  <option key={p.id} value={p.name} />
-                ))}
+                {db.pastors
+                  .filter((p) => p.isVisitorActive !== false)
+                  .map((p) => (
+                    <option key={p.id} value={p.name} />
+                  ))}
               </datalist>
             </div>
 

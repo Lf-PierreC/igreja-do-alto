@@ -3,6 +3,7 @@ import {
   DatabaseSchema,
   Member,
   PastorLeader,
+  UserAccessRole,
   VisitReport,
   VisitRequest,
 } from "@/types/visitas";
@@ -43,7 +44,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 // MAPPERS: SUPABASE (snake_case) <-> TYPESCRIPT (camelCase)
 // ============================================================================
 
-const PASTOR_AUTH_REGEX = /^\[\[AUTH:([^|]*)\|([^|]*)\|([^\]]*)\]\]/;
+const PASTOR_AUTH_REGEX = /^\[\[AUTH:([^|]*)\|([^|]*)\|([^|\]]*)(?:\|([^\]]*))?\]\]/;
 
 export function deriveDefaultUsername(name: string): string {
   const cleaned = name
@@ -67,7 +68,13 @@ export function mapRowToPastor(row: Record<string, any>): PastorLeader {
   const password =
     row.password || (match && match[2] ? match[2] : "igrejadoalto");
   const rawAccessRole = row.access_role || (match && match[3] ? match[3] : "pastor");
-  const accessRole = rawAccessRole === "admin" ? "admin" : "pastor";
+  const accessRole: UserAccessRole =
+    rawAccessRole === "admin"
+      ? "admin"
+      : rawAccessRole === "lider"
+      ? "lider"
+      : "pastor";
+  const isVisitorActive = match && match[4] ? match[4] !== "inactive" : true;
   const cleanRegion = rawRegion.replace(PASTOR_AUTH_REGEX, "").trim() || "Igreja do Alto";
 
   const memberId =
@@ -86,13 +93,20 @@ export function mapRowToPastor(row: Record<string, any>): PastorLeader {
     password,
     accessRole,
     memberId,
+    isVisitorActive,
   };
 }
 
 export function mapPastorToRow(p: PastorLeader) {
   const username = (p.username || deriveDefaultUsername(p.name)).trim().toLowerCase();
   const password = p.password || "igrejadoalto";
-  const accessRole = p.accessRole === "admin" ? "admin" : "pastor";
+  const accessRole =
+    p.accessRole === "admin"
+      ? "admin"
+      : p.accessRole === "lider"
+      ? "lider"
+      : "pastor";
+  const visitorStatus = p.isVisitorActive === false ? "inactive" : "active";
   const cleanRegion = (p.regionFocus || "Igreja do Alto").replace(PASTOR_AUTH_REGEX, "").trim() || "Igreja do Alto";
 
   return {
@@ -100,7 +114,7 @@ export function mapPastorToRow(p: PastorLeader) {
     name: p.name,
     role: p.role || "Pastores",
     phone: p.phone || "",
-    region_focus: `[[AUTH:${username}|${password}|${accessRole}]]${cleanRegion}`,
+    region_focus: `[[AUTH:${username}|${password}|${accessRole}|${visitorStatus}]]${cleanRegion}`,
   };
 }
 
@@ -168,6 +182,8 @@ export function mapRowToMember(row: Record<string, any>): Member {
     portalRole: row.portal_role || portalData.portalRole || undefined,
     isPastor: row.is_pastor ?? portalData.isPastor ?? false,
     isAdmin: row.is_admin ?? portalData.isAdmin ?? false,
+    isLeader: Boolean(portalData.isLeader),
+    isVisitorActive: portalData.isVisitorActive !== undefined ? portalData.isVisitorActive : true,
     currentMinistries:
       Array.isArray(row.current_ministries)
         ? row.current_ministries
@@ -200,6 +216,8 @@ export function mapMemberToRow(m: Member) {
     m.portalRole ||
     m.isPastor ||
     m.isAdmin ||
+    m.isLeader ||
+    m.isVisitorActive !== undefined ||
     m.pendingSpouseLink ||
     m.sentSpouseLinkRequest ||
     (m.dependents && m.dependents.length > 0) ||
@@ -221,6 +239,8 @@ export function mapMemberToRow(m: Member) {
       portalRole: m.portalRole || null,
       isPastor: m.isPastor ?? false,
       isAdmin: m.isAdmin ?? false,
+      isLeader: m.isLeader ?? false,
+      isVisitorActive: m.isVisitorActive !== undefined ? m.isVisitorActive : true,
       currentMinistries: m.currentMinistries || [],
       interestedMinistries: m.interestedMinistries || [],
       pendingSpouseLink: m.pendingSpouseLink || null,
