@@ -160,7 +160,7 @@ export function mapRowToMember(row: Record<string, any>): Member {
     familyRole: row.family_role || portalData.familyRole || undefined,
     spouseMemberId: row.spouse_member_id || portalData.spouseMemberId || undefined,
     dependents:
-      Array.isArray(row.dependents) && row.dependents.length > 0
+      Array.isArray(row.dependents)
         ? row.dependents
         : Array.isArray(portalData.dependents)
         ? portalData.dependents
@@ -169,13 +169,13 @@ export function mapRowToMember(row: Record<string, any>): Member {
     isPastor: row.is_pastor ?? portalData.isPastor ?? false,
     isAdmin: row.is_admin ?? portalData.isAdmin ?? false,
     currentMinistries:
-      Array.isArray(row.current_ministries) && row.current_ministries.length > 0
+      Array.isArray(row.current_ministries)
         ? row.current_ministries
         : Array.isArray(portalData.currentMinistries)
         ? portalData.currentMinistries
         : [],
     interestedMinistries:
-      Array.isArray(row.interested_ministries) && row.interested_ministries.length > 0
+      Array.isArray(row.interested_ministries)
         ? row.interested_ministries
         : Array.isArray(portalData.interestedMinistries)
         ? portalData.interestedMinistries

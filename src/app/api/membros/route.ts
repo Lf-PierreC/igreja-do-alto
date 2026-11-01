@@ -203,24 +203,24 @@ export async function GET(request: Request) {
         needsSync = true;
       }
 
-      // Unifica dependentes de ambos
-      const merged: FamilyDependent[] = [...(member.dependents || [])];
-      for (const dep of spouse.dependents || []) {
-        if (
-          !merged.some(
-            (d) =>
-              d.id === dep.id ||
-              (d.fullName?.toLowerCase() === dep.fullName?.toLowerCase() &&
-                d.birthDate === dep.birthDate)
-          )
-        ) {
-          merged.push(dep);
-          needsSync = true;
-        }
+      // Se um dos cônjuges tem a lista de filhos e o outro ainda está vazio, compartilha os filhos
+      if (
+        (!member.dependents || member.dependents.length === 0) &&
+        spouse.dependents &&
+        spouse.dependents.length > 0
+      ) {
+        member.dependents = [...spouse.dependents];
+        needsSync = true;
+      } else if (
+        (!spouse.dependents || spouse.dependents.length === 0) &&
+        member.dependents &&
+        member.dependents.length > 0
+      ) {
+        spouse.dependents = [...member.dependents];
+        needsSync = true;
       }
+
       if (needsSync) {
-        member.dependents = merged;
-        spouse.dependents = merged;
         writeLocalDb(db);
         const supabase = getSupabaseClient();
         if (supabase) {
@@ -237,22 +237,13 @@ export async function GET(request: Request) {
       }
     }
 
-    // Unifica dependentes garantindo que todos os filhos apareçam no painel
-    const finalDependents: FamilyDependent[] = [...(member.dependents || [])];
-    if (spouse && Array.isArray(spouse.dependents)) {
-      for (const dep of spouse.dependents) {
-        if (
-          !finalDependents.some(
-            (d) =>
-              d.id === dep.id ||
-              (d.fullName?.toLowerCase() === dep.fullName?.toLowerCase() &&
-                d.birthDate === dep.birthDate)
-          )
-        ) {
-          finalDependents.push(dep);
-        }
-      }
-    }
+    // Lista definitiva de dependentes do núcleo familiar
+    const finalDependents: FamilyDependent[] =
+      Array.isArray(member.dependents) && member.dependents.length > 0
+        ? member.dependents
+        : spouse && Array.isArray(spouse.dependents) && spouse.dependents.length > 0
+        ? spouse.dependents
+        : [];
 
     // Busca solicitações da família
     const familyRequests = db.requests.filter(
@@ -800,12 +791,31 @@ export async function POST(request: Request) {
         );
       }
 
+      if (member.spouseMemberId === spouse.id) {
+        return NextResponse.json(
+          { error: `Você já possui vínculo de cônjuge ativo com ${spouse.name}.` },
+          { status: 400 }
+        );
+      }
+
       if (spouse.spouseMemberId && spouse.spouseMemberId !== member.id) {
         return NextResponse.json(
           {
             error: `${spouse.name} já possui outro vínculo de cônjuge ativo no sistema.`,
           },
           { status: 409 }
+        );
+      }
+
+      if (
+        member.sentSpouseLinkRequest &&
+        member.sentSpouseLinkRequest.targetId === spouse.id
+      ) {
+        return NextResponse.json(
+          {
+            error: `Você já enviou uma solicitação de vínculo para ${spouse.name}. Aguarde ele(a) aceitar no portal dele(a).`,
+          },
+          { status: 400 }
         );
       }
 
@@ -1132,8 +1142,23 @@ export async function POST(request: Request) {
       let spouse: Member | null = null;
       if (member.spouseMemberId) {
         spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
-        if (spouse) {
-          if (!spouse.dependents) spouse.dependents = [];
+      }
+      if (!spouse) {
+        spouse =
+          db.members.find(
+            (m) => m.id !== member.id && m.spouseMemberId === member.id
+          ) || null;
+      }
+      if (!spouse && member.familyId) {
+        spouse =
+          db.members.find(
+            (m) => m.familyId === member.familyId && m.id !== member.id
+          ) || null;
+      }
+
+      if (spouse) {
+        if (!spouse.dependents) spouse.dependents = [];
+        if (!spouse.dependents.some((d) => d.id === newDependent.id)) {
           spouse.dependents.push(newDependent);
         }
       }
@@ -1168,18 +1193,45 @@ export async function POST(request: Request) {
         );
       }
 
-      member.dependents = (member.dependents || []).filter(
-        (d) => d.id !== dependentId
-      );
+      // Procura o dependente a ser removido no membro para obter nome e nascimento
+      const depToRemove = (member.dependents || []).find((d) => d.id === dependentId);
+      const targetName = depToRemove?.fullName?.trim().toLowerCase();
+      const targetBirth = depToRemove?.birthDate;
+
+      const isMatch = (d: FamilyDependent) => {
+        if (d.id === dependentId) return true;
+        if (
+          targetName &&
+          targetBirth &&
+          d.fullName?.trim().toLowerCase() === targetName &&
+          d.birthDate === targetBirth
+        ) {
+          return true;
+        }
+        return false;
+      };
+
+      member.dependents = (member.dependents || []).filter((d) => !isMatch(d));
 
       let spouse: Member | null = null;
       if (member.spouseMemberId) {
         spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
-        if (spouse) {
-          spouse.dependents = (spouse.dependents || []).filter(
-            (d) => d.id !== dependentId
-          );
-        }
+      }
+      if (!spouse) {
+        spouse =
+          db.members.find(
+            (m) => m.id !== member.id && m.spouseMemberId === member.id
+          ) || null;
+      }
+      if (!spouse && member.familyId) {
+        spouse =
+          db.members.find(
+            (m) => m.familyId === member.familyId && m.id !== member.id
+          ) || null;
+      }
+
+      if (spouse) {
+        spouse.dependents = (spouse.dependents || []).filter((d) => !isMatch(d));
       }
 
       writeLocalDb(db);
@@ -1194,7 +1246,12 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({ ok: true, dependents: member.dependents });
+      return NextResponse.json({
+        ok: true,
+        member,
+        spouse,
+        dependents: member.dependents,
+      });
     }
 
     // 7. SOLICITAR VISITA PASTORAL DIRETO DO PORTAL DO MEMBRO

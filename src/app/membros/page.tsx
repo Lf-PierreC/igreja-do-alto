@@ -814,6 +814,9 @@ export default function PortalDoMembroPage() {
       }
 
       setDependents(data.dependents);
+      if (memberData) {
+        setMemberData({ ...memberData, dependents: data.dependents });
+      }
       setIsAddDepOpen(false);
       setDepName("");
       setDepBirthDate("");
@@ -851,11 +854,30 @@ export default function PortalDoMembroPage() {
           });
 
           const data = await res.json();
-          if (res.ok && data.dependents) {
-            setDependents(data.dependents);
+          if (!res.ok) {
+            throw new Error(data.error || "Erro ao remover dependente.");
           }
+
+          const updatedDeps = data.dependents || [];
+          setDependents(updatedDeps);
+          if (memberData) {
+            setMemberData({ ...memberData, dependents: updatedDeps });
+          }
+          setSpouseLinkMessage({
+            type: "success",
+            text: `"${depName}" foi removido(a) com sucesso da lista de dependentes.`,
+          });
         } catch (err) {
           console.error("Erro ao remover dependente:", err);
+          setAlertModal({
+            open: true,
+            title: "Erro ao Remover Dependente",
+            message:
+              err instanceof Error
+                ? err.message
+                : "Não foi possível remover o dependente.",
+            type: "error",
+          });
         }
       },
     });
