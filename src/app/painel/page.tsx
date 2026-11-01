@@ -68,6 +68,7 @@ export default function PainelLideresPage() {
   const [loginPass, setLoginPass] = useState<string>("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [copiedMemberLink, setCopiedMemberLink] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [db, setDb] = useState<DatabaseSchema>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
@@ -164,117 +165,54 @@ export default function PainelLideresPage() {
     }
   }, [db.pastors, currentUser]);
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoginError(null);
+    setIsLoggingIn(true);
 
-    const inputUser = loginUser.trim().toLowerCase();
-    const inputPass = loginPass;
+    try {
+      const res = await fetch("/api/dados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "LOGIN_VISITAS",
+          payload: {
+            login: loginUser,
+            password: loginPass,
+          },
+        }),
+      });
 
-    // 1. Verifica Login Mestre de Administrador
-    if (
-      inputUser === EXPECTED_ADMIN_USER.toLowerCase() &&
-      inputPass === EXPECTED_ADMIN_PASS
-    ) {
-      const masterSession: LoggedUser = {
-        id: "master-admin",
-        name: "Administração Geral",
-        username: EXPECTED_ADMIN_USER,
-        accessRole: "admin",
-      };
-      setCurrentUser(masterSession);
-      setActiveTab("dashboard");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error || "Usuário ou senha inválidos. Verifique suas credenciais."
+        );
+      }
+
+      if (data.db) {
+        setDb(data.db);
+      }
+      setCurrentUser(data.session);
+      setActiveTab(
+        data.session.accessRole === "admin" ? "dashboard" : "nova-visita"
+      );
+
       try {
         window.localStorage.setItem(
           SESSION_STORAGE_KEY,
-          JSON.stringify(masterSession)
+          JSON.stringify(data.session)
         );
       } catch {
         // ignore
       }
-      return;
-    }
-
-    // 2. Verifica Login Individual de Pastor / Administrador cadastrado
-    const inputCleanDigits = inputUser.replace(/\D/g, "");
-
-    let matchedPastor = db.pastors.find((p) => {
-      const pUser = (p.username || deriveDefaultUsername(p.name))
-        .trim()
-        .toLowerCase();
-      const pName = p.name.trim().toLowerCase();
-      return pUser === inputUser || pName === inputUser;
-    });
-
-    // Se não encontrou pastor direto, procura em db.members com perfil pastoral/admin
-    const matchedMember = db.members.find((m) => {
-      if (!m.isPastor && !m.isAdmin && m.portalRole !== "pastor" && m.portalRole !== "admin") return false;
-      const mCpf = (m.cpf || "").replace(/\D/g, "");
-      const mEmail = (m.email || "").trim().toLowerCase();
-      const mName = m.name.trim().toLowerCase();
-      const mUser = deriveDefaultUsername(m.name).toLowerCase();
-      return (
-        (inputCleanDigits && mCpf === inputCleanDigits) ||
-        mEmail === inputUser ||
-        mName === inputUser ||
-        mUser === inputUser
+    } catch (err) {
+      setLoginError(
+        err instanceof Error ? err.message : "Erro ao efetuar login."
       );
-    });
-
-    if (!matchedPastor && matchedMember) {
-      matchedPastor = db.pastors.find(
-        (p) =>
-          p.memberId === matchedMember.id ||
-          p.id === `pas-${matchedMember.id}` ||
-          p.name.trim().toLowerCase() === matchedMember.name.trim().toLowerCase()
-      );
+    } finally {
+      setIsLoggingIn(false);
     }
-
-    if (matchedPastor || matchedMember) {
-      const name = matchedPastor?.name || matchedMember!.name;
-      const id =
-        matchedPastor?.id ||
-        (matchedMember ? `pas-${matchedMember.id}` : "pastor-session");
-      const username =
-        matchedPastor?.username ||
-        matchedMember?.email ||
-        matchedMember?.cpf ||
-        deriveDefaultUsername(name);
-      const role: UserAccessRole =
-        matchedPastor?.accessRole === "admin" ||
-        matchedMember?.isAdmin ||
-        matchedMember?.portalRole === "admin"
-          ? "admin"
-          : "pastor";
-
-      const validPastorPass =
-        matchedPastor?.password && inputPass === matchedPastor.password;
-      const validMemberPass =
-        matchedMember?.password && inputPass === matchedMember.password;
-      const masterPass = inputPass === "igrejadoalto";
-
-      if (validPastorPass || validMemberPass || masterPass) {
-        const pastorSession: LoggedUser = {
-          id,
-          name,
-          username,
-          accessRole: role,
-        };
-        setCurrentUser(pastorSession);
-        setActiveTab(role === "admin" ? "dashboard" : "nova-visita");
-        try {
-          window.localStorage.setItem(
-            SESSION_STORAGE_KEY,
-            JSON.stringify(pastorSession)
-          );
-        } catch {
-          // ignore
-        }
-        return;
-      }
-    }
-
-    setLoginError("Usuário ou senha inválidos. Verifique suas credenciais.");
   };
 
   const handleLogout = () => {
@@ -407,7 +345,7 @@ export default function PainelLideresPage() {
               </div>
             </div>
 
-            <form onSubmit={handleLogin} className="p-6 sm:p-8 space-y-5">
+            <form onSubmit={handleLogin} className="p-6 sm:p-8 space-y-4">
               {loginError && (
                 <div
                   role="alert"
@@ -423,7 +361,7 @@ export default function PainelLideresPage() {
                   htmlFor="login-user"
                   className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
                 >
-                  Seu Usuário
+                  Seu CPF ou E-mail
                 </label>
                 <input
                   id="login-user"
@@ -432,7 +370,7 @@ export default function PainelLideresPage() {
                   autoComplete="username"
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="Ex: marcos, rafael, admin..."
+                  placeholder="000.000.000-00 ou seu@email.com"
                   className="w-full rounded-xl border-2 border-[#252525]/25 bg-white px-4 py-3 text-sm font-semibold text-[#252525]"
                 />
               </div>
@@ -442,7 +380,7 @@ export default function PainelLideresPage() {
                   htmlFor="login-pass"
                   className="block text-xs font-extrabold uppercase tracking-wider text-[#252525] mb-1.5"
                 >
-                  Senha de Acesso
+                  Sua Senha
                 </label>
                 <input
                   id="login-pass"
@@ -458,10 +396,30 @@ export default function PainelLideresPage() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-colors"
+                disabled={isLoggingIn}
+                className="w-full py-3.5 px-6 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-colors flex items-center justify-center gap-2"
               >
-                Entrar no Sistema
+                {isLoggingIn ? (
+                  <span>Entrando...</span>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>Entrar no Portal de Visitas</span>
+                  </>
+                )}
               </button>
+
+              <div className="pt-2 border-t border-[#252525]/10 space-y-2 text-center">
+                <p className="text-[11px] text-[#252525]/70 font-semibold leading-relaxed">
+                  💡 <strong>Pastores:</strong> usem o mesmo CPF ou E-mail e senha cadastrados no Portal do Membro.
+                </p>
+                <Link
+                  href="/membros"
+                  className="inline-block text-xs font-black text-[#CB4B3B] hover:underline"
+                >
+                  É membro da igreja? Acesse o Portal do Membro aqui →
+                </Link>
+              </div>
             </form>
           </div>
         </main>

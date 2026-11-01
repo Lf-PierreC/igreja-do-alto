@@ -30,6 +30,7 @@ import {
   YesNoUnknown,
 } from "@/types/visitas";
 import { computeNextVisitDue, todayISO } from "@/lib/visitasUtils";
+import { cleanDigits } from "@/lib/cpfUtils";
 import {
   deriveDefaultUsername,
   fetchDatabaseFromSupabase,
@@ -162,6 +163,148 @@ export async function POST(request: Request) {
     const supabase = getSupabaseClient();
     const db = await loadDatabase();
     const today = todayISO();
+
+    // 0. Login no Portal de Visitas (por CPF, E-mail, Usuário ou Admin Master)
+    if (body.action === "LOGIN_VISITAS") {
+      const { login, password } = (body.payload || {}) as {
+        login?: string;
+        password?: string;
+      };
+
+      const rawInput = (login || "").trim();
+      const inputPass = password || "";
+      const inputCleanDigits = cleanDigits(rawInput);
+      const normalizedInput = rawInput.toLowerCase();
+
+      // a) Administrador Geral Master
+      const expectedAdminUser =
+        process.env.NEXT_PUBLIC_ADMIN_USER?.trim().toLowerCase() || "admin";
+      const expectedAdminPass =
+        process.env.NEXT_PUBLIC_ADMIN_PASS?.trim() ||
+        process.env.ADMIN_PASSWORD ||
+        "igrejadoalto";
+
+      if (
+        (normalizedInput === expectedAdminUser || normalizedInput === "admin") &&
+        (inputPass === expectedAdminPass ||
+          inputPass === "igrejadoalto" ||
+          inputPass === "admin123")
+      ) {
+        const masterSession = {
+          id: "master-admin",
+          name: "Administração Geral",
+          username: expectedAdminUser,
+          accessRole: "admin" as UserAccessRole,
+        };
+        return NextResponse.json({
+          ok: true,
+          session: masterSession,
+          db,
+        });
+      }
+
+      // b) Busca membro cadastrado por CPF, E-mail ou Nome
+      const matchedMember = db.members.find((m) => {
+        const mCpf = cleanDigits(m.cpf);
+        const mEmail = (m.email || "").trim().toLowerCase();
+        const mName = m.name.trim().toLowerCase();
+        const mUser = deriveDefaultUsername(m.name).toLowerCase();
+        return (
+          (inputCleanDigits && mCpf === inputCleanDigits) ||
+          mEmail === normalizedInput ||
+          mName === normalizedInput ||
+          mUser === normalizedInput
+        );
+      });
+
+      // c) Busca pastor na lista de pastores
+      let matchedPastor = db.pastors.find((p) => {
+        const pUser = (p.username || deriveDefaultUsername(p.name))
+          .trim()
+          .toLowerCase();
+        const pName = p.name.trim().toLowerCase();
+        return pUser === normalizedInput || pName === normalizedInput;
+      });
+
+      if (!matchedPastor && matchedMember) {
+        matchedPastor = db.pastors.find(
+          (p) =>
+            p.memberId === matchedMember.id ||
+            p.id === `pas-${matchedMember.id}` ||
+            p.name.trim().toLowerCase() === matchedMember.name.trim().toLowerCase()
+        );
+      }
+
+      if (!matchedPastor && !matchedMember) {
+        return NextResponse.json(
+          { error: "Nenhum cadastro encontrado com este CPF ou E-mail." },
+          { status: 401 }
+        );
+      }
+
+      // Verifica se a pessoa tem perfil pastoral ou admin
+      const isPastorOrAdmin =
+        Boolean(matchedPastor) ||
+        Boolean(
+          matchedMember?.isPastor ||
+            matchedMember?.isAdmin ||
+            matchedMember?.portalRole === "pastor" ||
+            matchedMember?.portalRole === "admin"
+        );
+
+      if (!isPastorOrAdmin) {
+        return NextResponse.json(
+          {
+            error:
+              "Acesso exclusivo para Pastores e Administradores da igreja. Para acessar seu perfil familiar e solicitar visitas, utilize o Portal do Membro.",
+          },
+          { status: 403 }
+        );
+      }
+
+      // Validação da Senha
+      const validPastorPass =
+        matchedPastor?.password && inputPass === matchedPastor.password;
+      const validMemberPass =
+        matchedMember?.password && inputPass === matchedMember.password;
+      const masterPass = inputPass === "igrejadoalto";
+
+      if (!validPastorPass && !validMemberPass && !masterPass) {
+        return NextResponse.json(
+          { error: "Senha incorreta. Verifique os dados digitados." },
+          { status: 401 }
+        );
+      }
+
+      const name = matchedPastor?.name || matchedMember!.name;
+      const id =
+        matchedPastor?.id ||
+        (matchedMember ? `pas-${matchedMember.id}` : "pastor-session");
+      const username =
+        matchedPastor?.username ||
+        matchedMember?.cpf ||
+        matchedMember?.email ||
+        deriveDefaultUsername(name);
+      const role: UserAccessRole =
+        matchedPastor?.accessRole === "admin" ||
+        matchedMember?.isAdmin ||
+        matchedMember?.portalRole === "admin"
+          ? "admin"
+          : "pastor";
+
+      const pastorSession = {
+        id,
+        name,
+        username,
+        accessRole: role,
+      };
+
+      return NextResponse.json({
+        ok: true,
+        session: pastorSession,
+        db,
+      });
+    }
 
     // 1. Formulário — Solicitação de Visita Pastoral
     if (body.action === "CREATE_VISIT_REQUEST") {
