@@ -87,6 +87,8 @@ import {
   AlertTriangle,
   Camera,
   Upload,
+  Bell,
+  Clock3,
 } from "lucide-react";
 
 const MEMBER_SESSION_KEY = "igreja_alto_member_session_v1";
@@ -627,17 +629,146 @@ export default function PortalDoMembroPage() {
         throw new Error(data.error || "Não foi possível vincular o cônjuge.");
       }
 
-      setSpouseData(data.spouse);
-      setDependents(data.dependents || []);
-      setSpouseLinkMessage({
-        type: "success",
-        text: `Vínculo com ${data.spouse.name} realizado com sucesso!`,
-      });
+      if (data.pending) {
+        if (memberData) {
+          setMemberData({
+            ...memberData,
+            sentSpouseLinkRequest: data.sentRequest,
+          });
+        }
+        setSpouseLinkMessage({
+          type: "success",
+          text: data.message,
+        });
+      } else {
+        setSpouseData(data.spouse);
+        setDependents(data.dependents || []);
+        if (memberData && data.member) {
+          setMemberData(data.member);
+        }
+        setSpouseLinkMessage({
+          type: "success",
+          text:
+            data.message ||
+            `Vínculo com ${data.spouse.name} realizado com sucesso!`,
+        });
+      }
       setSpouseIdentifier("");
     } catch (err) {
       setSpouseLinkMessage({
         type: "error",
         text: err instanceof Error ? err.message : "Erro ao vincular cônjuge.",
+      });
+    } finally {
+      setIsLinkingSpouse(false);
+    }
+  };
+
+  const handleAcceptSpouseLink = async () => {
+    if (!session || !memberData?.pendingSpouseLink) return;
+    setIsLinkingSpouse(true);
+    setSpouseLinkMessage(null);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "FAMILY_ACCEPT_SPOUSE_LINK",
+          payload: {
+            memberId: session.id,
+            requesterId: memberData.pendingSpouseLink.requesterId,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(
+          data.error || "Erro ao aceitar solicitação de vínculo."
+        );
+
+      setSpouseData(data.spouse);
+      setDependents(data.dependents || []);
+      if (data.member) {
+        setMemberData(data.member);
+      }
+      setSpouseLinkMessage({
+        type: "success",
+        text: `Vínculo com ${data.spouse.name} aceito e confirmado com sucesso! Vocês agora compartilham o mesmo núcleo familiar e filhos.`,
+      });
+    } catch (err) {
+      setSpouseLinkMessage({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Erro ao aceitar solicitação de vínculo.",
+      });
+    } finally {
+      setIsLinkingSpouse(false);
+    }
+  };
+
+  const handleRejectSpouseLink = async () => {
+    if (!session) return;
+    setIsLinkingSpouse(true);
+    setSpouseLinkMessage(null);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "FAMILY_REJECT_SPOUSE_LINK",
+          payload: { memberId: session.id },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao recusar vínculo.");
+      if (memberData) {
+        setMemberData({ ...memberData, pendingSpouseLink: null });
+      }
+      setSpouseLinkMessage({
+        type: "success",
+        text: "Solicitação de vínculo recusada.",
+      });
+    } catch (err) {
+      setSpouseLinkMessage({
+        type: "error",
+        text:
+          err instanceof Error ? err.message : "Erro ao recusar solicitação.",
+      });
+    } finally {
+      setIsLinkingSpouse(false);
+    }
+  };
+
+  const handleCancelSpouseLink = async () => {
+    if (!session) return;
+    setIsLinkingSpouse(true);
+    setSpouseLinkMessage(null);
+    try {
+      const res = await fetch("/api/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "FAMILY_CANCEL_SPOUSE_LINK_REQUEST",
+          payload: { memberId: session.id },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error || "Erro ao cancelar solicitação.");
+      if (memberData) {
+        setMemberData({ ...memberData, sentSpouseLinkRequest: null });
+      }
+      setSpouseLinkMessage({
+        type: "success",
+        text: "Solicitação de vínculo cancelada com sucesso.",
+      });
+    } catch (err) {
+      setSpouseLinkMessage({
+        type: "error",
+        text:
+          err instanceof Error ? err.message : "Erro ao cancelar solicitação.",
       });
     } finally {
       setIsLinkingSpouse(false);
@@ -2178,6 +2309,7 @@ export default function PortalDoMembroPage() {
               id: ActiveTab;
               label: string;
               icon: any;
+              badge?: number;
             }[] = [];
 
             if (session.isAdmin) {
@@ -2202,6 +2334,7 @@ export default function PortalDoMembroPage() {
               id: "familia",
               label: `Família (${dependents.length + (spouseData ? 2 : 1)})`,
               icon: Home,
+              badge: memberData?.pendingSpouseLink ? 1 : 0,
             });
 
             if (!session.isAdmin) {
@@ -2228,7 +2361,7 @@ export default function PortalDoMembroPage() {
               icon: User,
             });
 
-            return tabs.map((tab) => {
+            return tabs.map((tab: any) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -2236,7 +2369,7 @@ export default function PortalDoMembroPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${
+                  className={`relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${
                     isActive
                       ? "bg-[#CB4B3B] text-[#DCDACF] shadow"
                       : "text-[#DCDACF]/80 hover:bg-[#363636] hover:text-white"
@@ -2244,6 +2377,12 @@ export default function PortalDoMembroPage() {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
+                  {tab.badge ? (
+                    <span className="flex h-2.5 w-2.5 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                    </span>
+                  ) : null}
                 </button>
               );
             });
@@ -2253,6 +2392,44 @@ export default function PortalDoMembroPage() {
 
       {/* Conteúdo Principal */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* Notificação Global: Solicitação de Vínculo de Cônjuge Pendente */}
+        {memberData?.pendingSpouseLink && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFBEB] border-2 border-amber-400 text-[#252525] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow">
+                <Bell className="w-5 h-5" />
+              </div>
+              <div>
+                <strong className="block text-sm font-black uppercase text-amber-950">
+                  💍 Solicitação de Vínculo de Cônjuge
+                </strong>
+                <p className="text-xs sm:text-sm text-amber-900 font-medium">
+                  <strong>{memberData.pendingSpouseLink.requesterName}</strong> solicitou vincular o cadastro com você como esposo(a) para unir o núcleo familiar e filhos.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleAcceptSpouseLink}
+                disabled={isLinkingSpouse}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow transition-colors flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isLinkingSpouse ? "Confirmando..." : "Aceitar Vínculo"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectSpouseLink}
+                disabled={isLinkingSpouse}
+                className="px-3 py-2.5 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-red-700 text-xs font-bold transition-colors"
+              >
+                ✕ Recusar
+              </button>
+            </div>
+          </div>
+        )}
+
         {adminFeedback && (
           <div
             className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${
@@ -2369,10 +2546,132 @@ export default function PortalDoMembroPage() {
                     </div>
                   )}
                 </div>
+              ) : memberData?.pendingSpouseLink ? (
+                <div className="space-y-4">
+                  <div className="p-5 rounded-2xl bg-[#FFFBEB] border-2 border-amber-400 space-y-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow">
+                          <Bell className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider text-amber-800">
+                            Solicitação de Vínculo Recebida
+                          </span>
+                          <strong className="block text-base font-black text-[#252525]">
+                            {memberData.pendingSpouseLink.requesterName}
+                          </strong>
+                          <span className="block text-xs font-semibold text-[#252525]/70">
+                            {memberData.pendingSpouseLink.requesterPhone || ""}{" "}
+                            {memberData.pendingSpouseLink.requesterEmail
+                              ? `• ${memberData.pendingSpouseLink.requesterEmail}`
+                              : ""}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-black uppercase tracking-wider shrink-0">
+                        Aguardando Você
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-[#252525]/85 leading-relaxed font-medium">
+                      <strong>{memberData.pendingSpouseLink.requesterName}</strong> solicitou vincular o cadastro com você como esposo(a). Ao aceitar, vocês compartilharão o mesmo núcleo familiar, endereço residencial e a lista de filhos no cuidado pastoral.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-300/50">
+                      <button
+                        type="button"
+                        onClick={handleAcceptSpouseLink}
+                        disabled={isLinkingSpouse}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow transition-colors"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>{isLinkingSpouse ? "Confirmando..." : "Aceitar Vínculo de Cônjuge"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRejectSpouseLink}
+                        disabled={isLinkingSpouse}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-300 bg-white hover:bg-red-50 text-red-700 text-xs font-bold transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Recusar</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {spouseLinkMessage && (
+                    <div
+                      className={`p-3 rounded-xl text-xs font-bold border ${
+                        spouseLinkMessage.type === "success"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+                      }`}
+                    >
+                      {spouseLinkMessage.text}
+                    </div>
+                  )}
+                </div>
+              ) : memberData?.sentSpouseLinkRequest ? (
+                <div className="space-y-4">
+                  <div className="p-5 rounded-2xl bg-white border-2 border-amber-300/60 space-y-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-black text-lg">
+                          <Clock3 className="w-6 h-6 text-amber-600" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider text-amber-800">
+                            Solicitação Enviada
+                          </span>
+                          <strong className="block text-base font-black text-[#252525]">
+                            {memberData.sentSpouseLinkRequest.targetName}
+                          </strong>
+                          <span className="block text-xs font-semibold text-[#252525]/70">
+                            {memberData.sentSpouseLinkRequest.targetEmail
+                              ? memberData.sentSpouseLinkRequest.targetEmail
+                              : "Aguardando confirmação"}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black uppercase tracking-wider shrink-0">
+                        ⏳ Pendente
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-[#252525]/80 font-medium leading-relaxed">
+                      Uma notificação foi enviada para o portal de <strong>{memberData.sentSpouseLinkRequest.targetName}</strong>. Assim que ele(a) acessar e aceitar o vínculo, seus perfis e os filhos serão conectados automaticamente.
+                    </p>
+
+                    <div className="pt-2 border-t border-[#252525]/10">
+                      <button
+                        type="button"
+                        onClick={handleCancelSpouseLink}
+                        disabled={isLinkingSpouse}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancelar Solicitação</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {spouseLinkMessage && (
+                    <div
+                      className={`p-3 rounded-xl text-xs font-bold border ${
+                        spouseLinkMessage.type === "success"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
+                      }`}
+                    >
+                      {spouseLinkMessage.text}
+                    </div>
+                  )}
+                </div>
               ) : memberData?.maritalStatus === "Casado(a)" ? (
                 <div className="space-y-3">
                   <p className="text-xs sm:text-sm text-[#252525]/80 font-medium leading-relaxed">
-                    Vincule o cadastro do seu esposo(a) digitando o <strong>CPF</strong> ou <strong>E-mail</strong> dele(a). Ao vincular, vocês compartilharão o mesmo núcleo familiar e a lista de filhos no cuidado pastoral.
+                    Vincule o cadastro do seu esposo(a) digitando o <strong>CPF</strong> ou <strong>E-mail</strong> dele(a). Ao solicitar, o cônjuge receberá uma notificação no portal para confirmar a união da família e dos filhos.
                   </p>
 
                   <form onSubmit={handleLinkSpouse} className="flex flex-col sm:flex-row gap-2 max-w-xl">
@@ -2389,7 +2688,7 @@ export default function PortalDoMembroPage() {
                       disabled={isLinkingSpouse}
                       className="px-5 py-2.5 rounded-xl bg-[#252525] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow shrink-0"
                     >
-                      {isLinkingSpouse ? "Vinculando..." : "Vincular Cônjuge"}
+                      {isLinkingSpouse ? "Enviando..." : "Solicitar Vínculo"}
                     </button>
                   </form>
 

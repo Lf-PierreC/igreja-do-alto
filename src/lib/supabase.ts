@@ -181,6 +181,8 @@ export function mapRowToMember(row: Record<string, any>): Member {
         ? portalData.interestedMinistries
         : [],
     photoUrl: row.photo_url || portalData.photoUrl || undefined,
+    pendingSpouseLink: portalData.pendingSpouseLink || undefined,
+    sentSpouseLinkRequest: portalData.sentSpouseLinkRequest || undefined,
   };
 }
 
@@ -198,6 +200,8 @@ export function mapMemberToRow(m: Member) {
     m.portalRole ||
     m.isPastor ||
     m.isAdmin ||
+    m.pendingSpouseLink ||
+    m.sentSpouseLinkRequest ||
     (m.dependents && m.dependents.length > 0) ||
     (m.currentMinistries && m.currentMinistries.length > 0) ||
     (m.interestedMinistries && m.interestedMinistries.length > 0);
@@ -219,6 +223,8 @@ export function mapMemberToRow(m: Member) {
       isAdmin: m.isAdmin ?? false,
       currentMinistries: m.currentMinistries || [],
       interestedMinistries: m.interestedMinistries || [],
+      pendingSpouseLink: m.pendingSpouseLink || null,
+      sentSpouseLinkRequest: m.sentSpouseLinkRequest || null,
     };
     finalNotes = `${baseNotes ? `${baseNotes}\n` : ""}[[MEMBER_PORTAL:${JSON.stringify(
       portalPayload

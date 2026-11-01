@@ -55,6 +55,50 @@ async function loadDatabase(): Promise<DatabaseSchema> {
   return readLocalDb();
 }
 
+function executeSpouseLink(member: Member, spouse: Member): FamilyDependent[] {
+  const unifiedFamilyId = member.familyId || spouse.familyId || `fam-${Date.now()}`;
+  member.familyId = unifiedFamilyId;
+  spouse.familyId = unifiedFamilyId;
+  member.spouseMemberId = spouse.id;
+  spouse.spouseMemberId = member.id;
+  member.spouseName = spouse.name;
+  spouse.spouseName = member.name;
+  member.maritalStatus = "Casado(a)";
+  spouse.maritalStatus = "Casado(a)";
+
+  // Limpa solicitações pendentes
+  member.pendingSpouseLink = null;
+  spouse.pendingSpouseLink = null;
+  member.sentSpouseLinkRequest = null;
+  spouse.sentSpouseLinkRequest = null;
+
+  // Sincroniza endereço caso um esteja sem endereço completo
+  if (member.address && member.address.street && (!spouse.address || !spouse.address.street)) {
+    spouse.address = { ...member.address };
+  } else if (spouse.address && spouse.address.street && (!member.address || !member.address.street)) {
+    member.address = { ...spouse.address };
+  }
+
+  // Unifica dependentes de ambos
+  const mergedDependents: FamilyDependent[] = [...(member.dependents || [])];
+  for (const dep of spouse.dependents || []) {
+    if (
+      !mergedDependents.some(
+        (d) =>
+          d.id === dep.id ||
+          (d.fullName?.toLowerCase() === dep.fullName?.toLowerCase() &&
+            d.birthDate === dep.birthDate)
+      )
+    ) {
+      mergedDependents.push(dep);
+    }
+  }
+  member.dependents = mergedDependents;
+  spouse.dependents = mergedDependents;
+
+  return mergedDependents;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const memberId = searchParams.get("memberId");
@@ -107,15 +151,107 @@ export async function GET(request: Request) {
       );
     }
 
-    // Busca cônjuge se houver
+    // Busca cônjuge com busca direta, reversa, por familyId ou nome
     let spouse: Member | null = null;
     if (member.spouseMemberId) {
       spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
-    } else if (member.familyId) {
+    }
+    if (!spouse) {
+      spouse = db.members.find((m) => m.id !== member.id && m.spouseMemberId === member.id) || null;
+    }
+    if (!spouse && member.familyId) {
       spouse =
         db.members.find(
           (m) => m.familyId === member.familyId && m.id !== member.id
         ) || null;
+    }
+    if (!spouse && member.spouseName && member.maritalStatus === "Casado(a)") {
+      const cleanSpouseName = member.spouseName.trim().toLowerCase();
+      spouse =
+        db.members.find(
+          (m) =>
+            m.id !== member.id &&
+            (m.name.toLowerCase() === cleanSpouseName ||
+              m.name.toLowerCase().startsWith(cleanSpouseName) ||
+              cleanSpouseName.startsWith(m.name.toLowerCase().split(" ")[0]))
+        ) || null;
+    }
+
+    // Auto-sincronização do casal e união de dependentes se cônjuge foi identificado
+    if (spouse) {
+      let needsSync = false;
+      if (member.spouseMemberId !== spouse.id) {
+        member.spouseMemberId = spouse.id;
+        needsSync = true;
+      }
+      if (spouse.spouseMemberId !== member.id) {
+        spouse.spouseMemberId = member.id;
+        needsSync = true;
+      }
+      if (member.spouseName !== spouse.name) {
+        member.spouseName = spouse.name;
+        needsSync = true;
+      }
+      if (spouse.spouseName !== member.name) {
+        spouse.spouseName = member.name;
+        needsSync = true;
+      }
+      if (!member.familyId || !spouse.familyId || member.familyId !== spouse.familyId) {
+        const sharedFamilyId = member.familyId || spouse.familyId || `fam-${Date.now()}`;
+        member.familyId = sharedFamilyId;
+        spouse.familyId = sharedFamilyId;
+        needsSync = true;
+      }
+
+      // Unifica dependentes de ambos
+      const merged: FamilyDependent[] = [...(member.dependents || [])];
+      for (const dep of spouse.dependents || []) {
+        if (
+          !merged.some(
+            (d) =>
+              d.id === dep.id ||
+              (d.fullName?.toLowerCase() === dep.fullName?.toLowerCase() &&
+                d.birthDate === dep.birthDate)
+          )
+        ) {
+          merged.push(dep);
+          needsSync = true;
+        }
+      }
+      if (needsSync) {
+        member.dependents = merged;
+        spouse.dependents = merged;
+        writeLocalDb(db);
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            await supabase
+              .from("members")
+              .upsert([mapMemberToRow(member), mapMemberToRow(spouse)], {
+                onConflict: "id",
+              });
+          } catch (supaErr) {
+            console.error("Erro na auto-sincronização do casal:", supaErr);
+          }
+        }
+      }
+    }
+
+    // Unifica dependentes garantindo que todos os filhos apareçam no painel
+    const finalDependents: FamilyDependent[] = [...(member.dependents || [])];
+    if (spouse && Array.isArray(spouse.dependents)) {
+      for (const dep of spouse.dependents) {
+        if (
+          !finalDependents.some(
+            (d) =>
+              d.id === dep.id ||
+              (d.fullName?.toLowerCase() === dep.fullName?.toLowerCase() &&
+                d.birthDate === dep.birthDate)
+          )
+        ) {
+          finalDependents.push(dep);
+        }
+      }
     }
 
     // Busca solicitações da família
@@ -148,7 +284,7 @@ export async function GET(request: Request) {
             cpf: spouse.cpf,
           }
         : null,
-      dependents: member.dependents || spouse?.dependents || [],
+      dependents: finalDependents,
       requests: familyRequests,
       allMembers: isPastorOrAdmin || scope === "all" ? db.members : undefined,
       pastors: isPastorOrAdmin || scope === "all" ? db.pastors : undefined,
@@ -625,7 +761,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, member, session: updatedSession });
     }
 
-    // 4. VINCULAR CÔNJUGE (Por CPF ou E-mail do cônjuge)
+    // 4. VINCULAR / SOLICITAR VÍNCULO DE CÔNJUGE (Por CPF ou E-mail do cônjuge)
     if (action === "FAMILY_LINK_SPOUSE") {
       const { memberId, spouseIdentifier } = payload;
       const cleanSpouseCpf = cleanDigits(spouseIdentifier);
@@ -651,34 +787,79 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Nenhum membro encontrado com este CPF ou e-mail. Peça para o seu cônjuge se cadastrar primeiro.",
+              "Nenhum membro encontrado com este CPF ou e-mail. Peça para o seu cônjuge se cadastrar primeiro no portal.",
           },
           { status: 404 }
         );
       }
 
-      // Vincula ambos na mesma família e compartilha endereço e dependentes
-      const unifiedFamilyId = member.familyId || spouse.familyId || `fam-${Date.now()}`;
-      member.familyId = unifiedFamilyId;
-      spouse.familyId = unifiedFamilyId;
-      member.spouseMemberId = spouse.id;
-      spouse.spouseMemberId = member.id;
-      member.spouseName = spouse.name;
-      spouse.spouseName = member.name;
-      member.maritalStatus = "Casado(a)";
-      spouse.maritalStatus = "Casado(a)";
-
-      // Unifica a lista de dependentes
-      const mergedDependents: FamilyDependent[] = [
-        ...(member.dependents || []),
-      ];
-      for (const dep of spouse.dependents || []) {
-        if (!mergedDependents.some((d) => d.id === dep.id || (d.fullName === dep.fullName && d.birthDate === dep.birthDate))) {
-          mergedDependents.push(dep);
-        }
+      if (spouse.id === member.id) {
+        return NextResponse.json(
+          { error: "Você não pode vincular seu próprio cadastro como cônjuge." },
+          { status: 400 }
+        );
       }
-      member.dependents = mergedDependents;
-      spouse.dependents = mergedDependents;
+
+      if (spouse.spouseMemberId && spouse.spouseMemberId !== member.id) {
+        return NextResponse.json(
+          {
+            error: `${spouse.name} já possui outro vínculo de cônjuge ativo no sistema.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      // Se o outro cônjuge já havia solicitado vínculo com este membro, confirma e vincula imediatamente!
+      if (
+        member.pendingSpouseLink &&
+        member.pendingSpouseLink.requesterId === spouse.id
+      ) {
+        const mergedDependents = executeSpouseLink(member, spouse);
+        writeLocalDb(db);
+
+        if (supabase) {
+          try {
+            await supabase
+              .from("members")
+              .upsert(
+                [mapMemberToRow(member), mapMemberToRow(spouse)],
+                { onConflict: "id" }
+              );
+          } catch (supaErr) {
+            console.error("Erro ao vincular cônjuge no Supabase:", supaErr);
+          }
+        }
+
+        return NextResponse.json({
+          ok: true,
+          pending: false,
+          message: `Vínculo com ${spouse.name} confirmado com sucesso! Vocês agora compartilham o mesmo núcleo familiar.`,
+          member,
+          spouse: {
+            id: spouse.id,
+            name: spouse.name,
+            phone: spouse.phone,
+            email: spouse.email,
+            cpf: spouse.cpf,
+          },
+          dependents: mergedDependents,
+        });
+      }
+
+      // Caso contrário, cria a notificação / solicitação pendente para o cônjuge aceitar
+      spouse.pendingSpouseLink = {
+        requesterId: member.id,
+        requesterName: member.name,
+        requesterEmail: member.email || undefined,
+        requesterPhone: member.phone || undefined,
+        requestedAt: todayISO(),
+      };
+      member.sentSpouseLinkRequest = {
+        targetId: spouse.id,
+        targetName: spouse.name,
+        targetEmail: spouse.email || undefined,
+        requestedAt: todayISO(),
+      };
 
       writeLocalDb(db);
 
@@ -691,7 +872,61 @@ export async function POST(request: Request) {
               { onConflict: "id" }
             );
         } catch (supaErr) {
-          console.error("Erro ao vincular cônjuge no Supabase:", supaErr);
+          console.error(
+            "Erro ao registrar notificação de vínculo no Supabase:",
+            supaErr
+          );
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        pending: true,
+        message: `Solicitação de vínculo enviada para ${spouse.name}! Uma notificação apareceu no portal dele(a) para confirmar o vínculo.`,
+        member,
+        sentRequest: member.sentSpouseLinkRequest,
+        targetSpouse: {
+          id: spouse.id,
+          name: spouse.name,
+          phone: spouse.phone,
+          email: spouse.email,
+        },
+      });
+    }
+
+    // 4.1. ACEITAR SOLICITAÇÃO DE VÍNCULO DE CÔNJUGE
+    if (action === "FAMILY_ACCEPT_SPOUSE_LINK") {
+      const { memberId, requesterId } = payload;
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      const reqId = requesterId || member.pendingSpouseLink?.requesterId;
+      const requester = db.members.find((m) => m.id === reqId);
+      if (!requester) {
+        return NextResponse.json(
+          { error: "Solicitante não encontrado ou solicitação expirada." },
+          { status: 404 }
+        );
+      }
+
+      const mergedDependents = executeSpouseLink(member, requester);
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          await supabase
+            .from("members")
+            .upsert(
+              [mapMemberToRow(member), mapMemberToRow(requester)],
+              { onConflict: "id" }
+            );
+        } catch (supaErr) {
+          console.error("Erro ao aceitar vínculo no Supabase:", supaErr);
         }
       }
 
@@ -699,16 +934,98 @@ export async function POST(request: Request) {
         ok: true,
         member,
         spouse: {
-          id: spouse.id,
-          name: spouse.name,
-          phone: spouse.phone,
-          email: spouse.email,
+          id: requester.id,
+          name: requester.name,
+          phone: requester.phone,
+          email: requester.email,
+          cpf: requester.cpf,
         },
         dependents: mergedDependents,
       });
     }
 
-    // 4.1. DESVINCULAR CÔNJUGE
+    // 4.2. RECUSAR SOLICITAÇÃO DE VÍNCULO DE CÔNJUGE
+    if (action === "FAMILY_REJECT_SPOUSE_LINK") {
+      const { memberId } = payload;
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      const requesterId = member.pendingSpouseLink?.requesterId;
+      const requester = requesterId
+        ? db.members.find((m) => m.id === requesterId)
+        : null;
+
+      member.pendingSpouseLink = null;
+      if (requester) {
+        requester.sentSpouseLinkRequest = null;
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          const toUpdate = [mapMemberToRow(member)];
+          if (requester) toUpdate.push(mapMemberToRow(requester));
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+        } catch (supaErr) {
+          console.error("Erro ao recusar vínculo no Supabase:", supaErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "Solicitação de vínculo recusada.",
+      });
+    }
+
+    // 4.3. CANCELAR SOLICITAÇÃO DE VÍNCULO ENVIADA
+    if (action === "FAMILY_CANCEL_SPOUSE_LINK_REQUEST") {
+      const { memberId } = payload;
+      const member = db.members.find((m) => m.id === memberId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Membro não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      const targetId = member.sentSpouseLinkRequest?.targetId;
+      const target = targetId
+        ? db.members.find((m) => m.id === targetId)
+        : null;
+
+      member.sentSpouseLinkRequest = null;
+      if (target && target.pendingSpouseLink?.requesterId === member.id) {
+        target.pendingSpouseLink = null;
+      }
+
+      writeLocalDb(db);
+
+      if (supabase) {
+        try {
+          const toUpdate = [mapMemberToRow(member)];
+          if (target) toUpdate.push(mapMemberToRow(target));
+          await supabase.from("members").upsert(toUpdate, { onConflict: "id" });
+        } catch (supaErr) {
+          console.error(
+            "Erro ao cancelar solicitação de vínculo no Supabase:",
+            supaErr
+          );
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "Solicitação cancelada com sucesso.",
+      });
+    }
+
+    // 4.4. DESVINCULAR CÔNJUGE
     if (action === "FAMILY_UNLINK_SPOUSE") {
       const { memberId } = payload;
       const member = db.members.find((m) => m.id === memberId);
@@ -723,15 +1040,25 @@ export async function POST(request: Request) {
       if (member.spouseMemberId) {
         spouse = db.members.find((m) => m.id === member.spouseMemberId) || null;
       }
+      if (!spouse) {
+        spouse =
+          db.members.find(
+            (m) => m.id !== member.id && m.spouseMemberId === member.id
+          ) || null;
+      }
 
       if (spouse) {
         spouse.spouseMemberId = undefined;
         spouse.spouseName = undefined;
+        spouse.pendingSpouseLink = null;
+        spouse.sentSpouseLinkRequest = null;
         spouse.familyId = `fam-${Date.now()}`;
       }
 
       member.spouseMemberId = undefined;
       member.spouseName = undefined;
+      member.pendingSpouseLink = null;
+      member.sentSpouseLinkRequest = null;
       member.familyId = `fam-${Date.now() + 1}`;
 
       writeLocalDb(db);

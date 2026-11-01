@@ -136,6 +136,25 @@ export interface Member {
 
   // Foto do Membro
   photoUrl?: string;
+
+  // Notificações e solicitações de vínculo de cônjuge
+  pendingSpouseLink?: PendingSpouseLink | null;
+  sentSpouseLinkRequest?: SentSpouseLinkRequest | null;
+}
+
+export interface PendingSpouseLink {
+  requesterId: string;
+  requesterName: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  requestedAt: string;
+}
+
+export interface SentSpouseLinkRequest {
+  targetId: string;
+  targetName: string;
+  targetEmail?: string;
+  requestedAt: string;
 }
 
 /** 1. Formulário — Solicitação de Visita Pastoral */
