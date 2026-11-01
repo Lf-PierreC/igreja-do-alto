@@ -3030,7 +3030,7 @@ export default function PortalDoMembroPage() {
                           onChange={(e) => setUseCustomAddress(e.target.checked)}
                           className="w-4 h-4 rounded"
                         />
-                        <span>Será em outro endereço (ex: hospital, trabalho)</span>
+                        <span>Será em outro endereço (ex: hospital, empresa, trabalho)</span>
                       </label>
                     </div>
 
@@ -4766,7 +4766,7 @@ export default function PortalDoMembroPage() {
                                   Observação para o Ministério de Louvor:
                                 </strong>
                                 <p>
-                                  O ingresso no ministério de Louvor é realizado mediante uma <strong>agenda prévia estabelecida de audições da Igreja do Alto</strong>.
+                                  A entrada no ministério de Louvor é realizada mediante uma <strong>agenda prévia estabelecida de audições da Igreja do Alto</strong>.
                                 </p>
                                 <p className="text-amber-900/90 text-[11px]">
                                   A igreja realiza períodos específicos de audições ao longo do ano (não temos datas fixas contínuas e as audições não são feitas de forma imediata). Ao manifestar seu interesse aqui, seu nome e contato ficam registrados em nosso banco de talentos e a liderança do Louvor entrará em contato quando o próximo ciclo oficial de audições for aberto!
