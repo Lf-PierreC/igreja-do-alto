@@ -57,7 +57,7 @@ interface BemVindosSession {
 export default function BemVindoPortalPage() {
   // Estado de Autenticação
   const [session, setSession] = useState<BemVindosSession | null>(null);
-  const [isPastorOrAdmin, setIsPastorOrAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
   // Formulário de Login
@@ -138,7 +138,7 @@ export default function BemVindoPortalPage() {
       if (stored) {
         const parsed = JSON.parse(stored);
         setSession(parsed);
-        setIsPastorOrAdmin(Boolean(parsed.isPastor || parsed.isAdmin));
+        setIsAdmin(Boolean(parsed.isAdmin));
       }
     } catch {
       // ignore
@@ -160,8 +160,8 @@ export default function BemVindoPortalPage() {
         setPendingRequestsCount(data.pendingRequestsCount || 0);
         if (data.accessRequests) setAccessRequests(data.accessRequests);
         if (data.team) setTeam(data.team);
-        if (typeof data.isPastorOrAdmin === "boolean") {
-          setIsPastorOrAdmin(data.isPastorOrAdmin);
+        if (typeof data.isAdmin === "boolean") {
+          setIsAdmin(data.isAdmin);
         }
       }
     } catch (err) {
@@ -204,15 +204,15 @@ export default function BemVindoPortalPage() {
         throw new Error(data.error || "Falha no login. Verifique seus dados.");
       }
 
-      // Caso 1: Usuário é pastor/admin ou membro já aprovado
+      // Caso 1: Usuário é admin ou membro/pastor já aprovado
       if (data.hasAccess) {
         setSession(data.session);
-        setIsPastorOrAdmin(Boolean(data.isPastorOrAdmin));
+        setIsAdmin(Boolean(data.isAdmin));
         localStorage.setItem("igreja_do_alto_bem_vindo_session", JSON.stringify(data.session));
         return;
       }
 
-      // Caso 2: Membro dos ministérios autorizados aguardando aprovação ou precisa solicitar
+      // Caso 2: Membro ou pastor aguardando aprovação ou precisa solicitar
       if (data.needsApproval) {
         setAccessPendingState({
           needed: true,
@@ -253,7 +253,7 @@ export default function BemVindoPortalPage() {
               ...prev,
               status: "pendente",
               canRequest: false,
-              message: "Sua solicitação foi enviada! A liderança pastoral notificará você assim que liberar seu acesso.",
+              message: "Sua solicitação foi enviada! O administrador notificará você assim que liberar seu acesso.",
             }
           : null
       );
@@ -267,7 +267,7 @@ export default function BemVindoPortalPage() {
   // Logout
   const handleLogout = () => {
     setSession(null);
-    setIsPastorOrAdmin(false);
+    setIsAdmin(false);
     setAccessPendingState(null);
     localStorage.removeItem("igreja_do_alto_bem_vindo_session");
   };
@@ -418,11 +418,11 @@ export default function BemVindoPortalPage() {
     }
   };
 
-  // Avaliação de Solicitação de Acesso (Pastores)
+  // Avaliação de Solicitação de Acesso (Administrador)
   const handleReviewRequest = async (
     requestId: string,
     decision: "aprovado" | "recusado",
-    role: "voluntario" | "lider" = "voluntario"
+    role: "voluntario" | "lider" | "pastor" = "voluntario"
   ) => {
     try {
       const res = await fetch("/api/bem-vindo", {
@@ -434,7 +434,7 @@ export default function BemVindoPortalPage() {
             requestId,
             decision,
             role,
-            reviewerName: session?.name || "Pastor",
+            reviewerName: session?.name || "Administrador",
             reviewerId: session?.id,
           },
         }),
@@ -452,7 +452,7 @@ export default function BemVindoPortalPage() {
     }
   };
 
-  // Revogação de Acesso (Pastores)
+  // Revogação de Acesso (Administrador)
   const handleRevokeAccess = async (memberId: string) => {
     if (!confirm("Tem certeza que deseja revogar o acesso deste membro à plataforma?")) return;
     try {
@@ -461,7 +461,7 @@ export default function BemVindoPortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "REVOKE_ACCESS",
-          payload: { memberId, reviewerName: session?.name || "Pastor" },
+          payload: { memberId, reviewerName: session?.name || "Administrador" },
         }),
       });
       const data = await res.json();
@@ -572,13 +572,13 @@ export default function BemVindoPortalPage() {
     return (
       <main className="min-h-screen bg-[#DCDACF] text-[#252525] flex flex-col items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-stone-200 p-6 sm:p-8">
-          <div className="text-center mb-6">
-            <div className="inline-block mb-3">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="mb-3">
               <BrandLogo variant="on-sand" size="sm" showTagline={false} />
             </div>
-            <div className="inline-flex items-center gap-1.5 bg-[#CB4B3B] text-white px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2">
+            <div className="inline-flex items-center gap-1.5 bg-[#CB4B3B] text-white px-3.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2.5 shadow-sm">
               <Heart className="w-3 h-3 fill-white" />
-              Ministério Bem-Vindo
+              <span>Ministério Bem-Vindo</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-[#252525]">
               Portal da Equipe
@@ -614,7 +614,7 @@ export default function BemVindoPortalPage() {
                       ) : (
                         <>
                           <ShieldCheck className="w-4 h-4" />
-                          <span>Solicitar Acesso à Liderança Pastoral</span>
+                          <span>Solicitar Acesso ao Administrador</span>
                         </>
                       )}
                     </button>
@@ -641,7 +641,7 @@ export default function BemVindoPortalPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                CPF, E-mail ou Usuário de Pastor
+                Login 
               </label>
               <input
                 type="text"
@@ -674,7 +674,7 @@ export default function BemVindoPortalPage() {
               </div>
               <p>
                 Permitido para membros vinculados aos ministérios: <strong>Bem-vindo</strong>,{" "}
-                <strong>A Mais</strong>, <strong>Evangelismo</strong> ou <strong>Pastores</strong>.
+                <strong>A Mais</strong>, <strong>Evangelismo</strong>, <strong>Líderes </strong> ou <strong>Pastores</strong>.
               </p>
             </div>
 
@@ -732,8 +732,10 @@ export default function BemVindoPortalPage() {
             <div className="text-right hidden sm:block">
               <p className="font-extrabold text-stone-900 leading-tight">{session.name}</p>
               <p className="text-stone-500 text-[11px]">
-                {isPastorOrAdmin
-                  ? "Liderança Pastoral / Admin"
+                {isAdmin
+                  ? "Administrador Geral"
+                  : session.teamRole === "pastor"
+                  ? "Pastor(a) / Liderança"
                   : session.teamRole === "lider"
                   ? "Líder de Equipe"
                   : "Voluntário(a) Aprovado(a)"}
@@ -792,8 +794,8 @@ export default function BemVindoPortalPage() {
               <span>Métricas & Canais</span>
             </button>
 
-            {/* ABA EXCLUSIVA DE PASTORES E ADMINS */}
-            {isPastorOrAdmin && (
+            {/* ABA EXCLUSIVA DE ADMINISTRADORES */}
+            {isAdmin && (
               <button
                 onClick={() => setActiveTab("acessos")}
                 className={`relative px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
@@ -1487,9 +1489,9 @@ export default function BemVindoPortalPage() {
         )}
 
         {/* =========================================================================
-            ABA 4: GESTÃO DE ACESSOS (EXCLUSIVO PASTORES E ADMINS)
+            ABA 4: GESTÃO DE ACESSOS (EXCLUSIVO ADMINISTRADORES)
            ========================================================================= */}
-        {activeTab === "acessos" && isPastorOrAdmin && (
+        {activeTab === "acessos" && isAdmin && (
           <div className="space-y-6 animate-fade-in">
             {/* Solicitações Pendentes */}
             <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
@@ -1500,7 +1502,7 @@ export default function BemVindoPortalPage() {
                     <span>Solicitações de Acesso Pendentes</span>
                   </h2>
                   <p className="text-xs text-stone-500">
-                    Membros dos ministérios autorizados aguardando liberação da liderança pastoral
+                    Pastores, líderes e voluntários aguardando liberação do administrador
                   </p>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-extrabold">
@@ -1541,7 +1543,7 @@ export default function BemVindoPortalPage() {
 
                         <div className="flex items-center gap-2 shrink-0">
                           <button
-                            onClick={() => handleReviewRequest(req.id, "aprovado", "voluntario")}
+                            onClick={() => handleReviewRequest(req.id, "aprovado", req.role || "voluntario")}
                             className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1"
                           >
                             <UserCheck className="w-3.5 h-3.5" />

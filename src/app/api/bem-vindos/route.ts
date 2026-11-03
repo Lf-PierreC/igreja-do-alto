@@ -7,7 +7,7 @@ import {
   saveTeamMemberSupabase,
   removeTeamMemberSupabase,
 } from "@/lib/bemVindosDb";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getSupabaseClient, fetchDatabaseFromSupabase } from "@/lib/supabase";
 import { cleanDigits } from "@/lib/cpfUtils";
 import {
   FirstTimeVisitor,
@@ -24,7 +24,15 @@ import { INITIAL_DATA } from "@/data/initialData";
 
 const DB_FILE_PATH = path.join(process.cwd(), "src", "data", "db.json");
 
-function loadMembersDb(): DatabaseSchema {
+async function loadMembersDb(): Promise<DatabaseSchema> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      return await fetchDatabaseFromSupabase(supabase);
+    } catch (err) {
+      console.error("Erro ao carregar membros do Supabase em /api/bem-vindos:", err);
+    }
+  }
   try {
     if (!fs.existsSync(DB_FILE_PATH)) return INITIAL_DATA;
     const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
@@ -45,27 +53,27 @@ export async function GET(request: Request) {
     const dateTo = searchParams.get("dateTo");
 
     const { visitors, requests, team } = await fetchBemVindosData();
-    const membersDb = loadMembersDb();
+    const membersDb = await loadMembersDb();
 
-    // Identifica se o usuário requisitante é pastor ou admin
-    let isPastorOrAdmin = false;
+    // Identifica se o usuário requisitante é admin (apenas admin gerencia acessos)
+    let isAdmin = false;
     let loggedMember: Member | null = null;
 
     if (requesterId === "admin-master") {
-      isPastorOrAdmin = true;
+      isAdmin = true;
     } else if (requesterId) {
       loggedMember = membersDb.members.find((m) => m.id === requesterId) || null;
-      const isPastorInList = membersDb.pastors.some(
+      const matchedPastor = membersDb.pastors.find(
         (p) =>
           p.memberId === requesterId ||
+          p.id === requesterId ||
           (loggedMember && p.name.toLowerCase() === loggedMember.name.toLowerCase())
       );
-      isPastorOrAdmin = Boolean(
-        loggedMember?.isPastor ||
+      isAdmin = Boolean(
         loggedMember?.isAdmin ||
-        loggedMember?.portalRole === "pastor" ||
         loggedMember?.portalRole === "admin" ||
-        isPastorInList
+        matchedPastor?.accessRole === "admin" ||
+        (loggedMember?.relationship && loggedMember.relationship.toLowerCase().includes("admin"))
       );
     }
 
@@ -135,10 +143,11 @@ export async function GET(request: Request) {
         statusBreakdown,
       },
       pendingRequestsCount: pendingRequests.length,
-      // Se for Pastor ou Admin, disponibiliza a lista completa de solicitações e equipe
-      accessRequests: isPastorOrAdmin ? requests : undefined,
-      team: isPastorOrAdmin ? team : undefined,
-      isPastorOrAdmin,
+      // Apenas Administradores têm acesso à lista de solicitações e à equipe
+      accessRequests: isAdmin ? requests : undefined,
+      team: isAdmin ? team : undefined,
+      isAdmin,
+      isPastorOrAdmin: isAdmin, // mantido para compatibilidade
     });
   } catch (error: any) {
     console.error("Erro no GET /api/bem-vindos:", error);
@@ -152,7 +161,7 @@ export async function POST(request: Request) {
     const { action, payload } = body;
     const supabase = getSupabaseClient();
     const data = await fetchBemVindosData();
-    const membersDb = loadMembersDb();
+    const membersDb = await loadMembersDb();
 
     // 1. CADASTRO PÚBLICO DE VISITANTE (PELO LINK AVULSO OU QR CODE)
     if (action === "PUBLIC_VISITOR_REGISTER") {
@@ -370,26 +379,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, visitor, note: newNote });
     }
 
-    // 5. SOLICITAR ACESSO AO PORTAL BEM-VINDOS
+    // 5. SOLICITAR ACESSO AO PORTAL BEM-VINDO
     if (action === "REQUEST_ACCESS") {
       const { memberId } = payload;
-      const member = membersDb.members.find((m) => m.id === memberId);
+      let member = membersDb.members.find((m) => m.id === memberId);
+      let pastor = membersDb.pastors.find((p) => p.id === memberId || p.memberId === memberId);
 
-      if (!member) {
-        return NextResponse.json({ error: "Membro não encontrado." }, { status: 404 });
+      if (!member && !pastor) {
+        return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
       }
 
-      // Validação: deve pertencer a Bem-Vindos, A Mais ou Evangelismo (ou ser pastor)
+      const isPastor = Boolean(member?.isPastor || pastor);
       const isEligible =
-        isMemberMinistryEligible(member.currentMinistries) ||
-        member.isPastor ||
-        member.isAdmin;
+        isPastor ||
+        isMemberMinistryEligible(member?.currentMinistries) ||
+        member?.isAdmin;
 
       if (!isEligible) {
         return NextResponse.json(
           {
             error:
-              "Acesso restrito: para solicitar permissão, o seu cadastro de membro precisa estar vinculado aos ministérios 'Bem-vindo (Recepção)', 'A Mais (Diaconia)' ou 'Evangelismo'. Você pode atualizar seus ministérios no Portal do Membro.",
+              "Acesso restrito: para solicitar permissão, o seu cadastro precisa estar vinculado aos ministérios 'Bem-vindo (Recepção)', 'A Mais (Diaconia)', 'Evangelismo' ou à Liderança Pastoral.",
           },
           { status: 403 }
         );
@@ -401,7 +411,7 @@ export async function POST(request: Request) {
         if (existingReq.status === "pendente") {
           return NextResponse.json({
             ok: true,
-            message: "Sua solicitação de acesso já está em análise pela liderança pastoral.",
+            message: "Sua solicitação de acesso já está em análise pelo administrador.",
             request: existingReq,
           });
         }
@@ -414,16 +424,21 @@ export async function POST(request: Request) {
         }
       }
 
+      const reqName = member?.name || pastor?.name || "Solicitante";
+      const reqEmail = member?.email || "";
+      const reqPhone = member?.phone || pastor?.phone || "";
+      const reqMinistries = member?.currentMinistries || (isPastor ? ["Liderança Pastoral"] : []);
+
       const newRequest: BemVindosAccessRequest = {
         id: `req-bv-${Date.now()}`,
-        memberId: member.id,
-        memberName: member.name,
-        memberEmail: member.email || "",
-        memberPhone: member.phone || "",
-        memberMinistries: member.currentMinistries || [],
+        memberId: memberId,
+        memberName: reqName,
+        memberEmail: reqEmail,
+        memberPhone: reqPhone,
+        memberMinistries: reqMinistries,
         status: "pendente",
         requestedAt: new Date().toISOString(),
-        role: "voluntario",
+        role: isPastor ? "pastor" : "voluntario",
       };
 
       data.requests.unshift(newRequest);
@@ -435,12 +450,12 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         ok: true,
-        message: "Solicitação enviada com sucesso à liderança pastoral!",
+        message: "Solicitação enviada com sucesso ao administrador!",
         request: newRequest,
       });
     }
 
-    // 6. AVALIAR SOLICITAÇÃO DE ACESSO (APENAS PASTOR OU ADMIN)
+    // 6. AVALIAR SOLICITAÇÃO DE ACESSO (APENAS ADMIN)
     if (action === "REVIEW_ACCESS_REQUEST") {
       const { requestId, decision, role, reviewerName, reviewerId } = payload;
 
@@ -451,7 +466,7 @@ export async function POST(request: Request) {
 
       const req = data.requests[reqIndex];
       req.status = decision; // 'aprovado' | 'recusado'
-      req.reviewedBy = reviewerName || "Pastor";
+      req.reviewedBy = reviewerName || "Administrador";
       req.reviewedAt = new Date().toISOString();
       req.role = role || "voluntario";
 
@@ -467,7 +482,7 @@ export async function POST(request: Request) {
           phone: req.memberPhone,
           role: role || "voluntario",
           approvedAt: new Date().toISOString(),
-          approvedBy: reviewerName || "Pastor",
+          approvedBy: reviewerName || "Administrador",
         };
 
         if (existingTeamIndex >= 0) {
@@ -496,7 +511,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, request: req, team: data.team });
     }
 
-    // 7. REVOGAR ACESSO DE UM MEMBRO (APENAS PASTOR OU ADMIN)
+    // 7. REVOGAR ACESSO DE UM MEMBRO (APENAS ADMIN)
     if (action === "REVOKE_ACCESS") {
       const { memberId, reviewerName } = payload;
 
@@ -504,7 +519,7 @@ export async function POST(request: Request) {
       const req = data.requests.find((r) => r.memberId === memberId);
       if (req) {
         req.status = "recusado";
-        req.reviewedBy = reviewerName || "Pastor";
+        req.reviewedBy = reviewerName || "Administrador";
         req.reviewedAt = new Date().toISOString();
       }
 
@@ -549,7 +564,11 @@ export async function POST(request: Request) {
 
       // Procura membro por CPF ou E-mail
       let member = membersDb.members.find((m) => {
-        const matchesCpf = cleanLogin && cleanDigits(m.cpf) === cleanLogin;
+        const mCpf = cleanDigits(m.cpf);
+        const matchesCpf =
+          cleanLogin &&
+          (mCpf === cleanLogin ||
+            (mCpf && cleanLogin && mCpf.padStart(11, "0") === cleanLogin.padStart(11, "0")));
         const matchesEmail = m.email && m.email.trim().toLowerCase() === normalizedLogin;
         return matchesCpf || matchesEmail;
       });
@@ -562,6 +581,15 @@ export async function POST(request: Request) {
       if (!member && pastor) {
         member = membersDb.members.find(
           (m) => m.id === pastor?.memberId || m.name.toLowerCase() === pastor?.name.toLowerCase()
+        );
+      }
+
+      if (member && !pastor) {
+        pastor = membersDb.pastors.find(
+          (p) =>
+            p.memberId === member!.id ||
+            p.id === member!.id ||
+            (p.name && member!.name && p.name.toLowerCase() === member!.name.toLowerCase())
         );
       }
 
@@ -581,60 +609,71 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Senha incorreta. Tente novamente." }, { status: 401 } );
       }
 
-      const isPastorOrAdmin = Boolean(
-        member?.isPastor ||
+      // Identifica se é Admin (apenas admin tem acesso direto e gerencia acessos)
+      const isAdmin = Boolean(
+        normalizedLogin === "admin" ||
         member?.isAdmin ||
-        member?.portalRole === "pastor" ||
         member?.portalRole === "admin" ||
+        pastor?.accessRole === "admin" ||
+        (member?.relationship && member.relationship.toLowerCase().includes("admin"))
+      );
+
+      const isPastor = Boolean(
+        member?.isPastor ||
+        member?.portalRole === "pastor" ||
         Boolean(pastor)
       );
 
-      const memberId = member?.id || pastor?.id || "pas-user";
-      const memberName = member?.name || pastor?.name || "Líder";
+      const memberId = member?.id || pastor?.id || (pastor ? `pas-${pastor.id}` : "mem-user");
+      const memberName = member?.name || pastor?.name || "Membro";
       const memberPhone = member?.phone || pastor?.phone || "";
       const memberEmail = member?.email || "";
-      const currentMinistries = member?.currentMinistries || [];
+      const currentMinistries = member?.currentMinistries || (isPastor ? ["Liderança Pastoral"] : []);
 
-      // SE FOR PASTOR OU ADMIN: Tem acesso imediato garantido
-      if (isPastorOrAdmin) {
+      // 1. SE FOR ADMIN: Tem acesso imediato garantido e gerencia a equipe
+      if (isAdmin) {
         return NextResponse.json({
           ok: true,
           hasAccess: true,
+          isAdmin: true,
           isPastorOrAdmin: true,
-          role: "pastor",
+          role: "admin",
           session: {
             id: memberId,
             name: memberName,
             email: memberEmail,
             phone: memberPhone,
-            isPastor: true,
-            isAdmin: Boolean(member?.isAdmin || pastor?.accessRole === "admin"),
+            isAdmin: true,
+            isPastor,
+            teamRole: "admin",
           },
         });
       }
 
-      // SE NÃO FOR PASTOR: Checa se pertence aos ministérios autorizados
-      const isEligibleMinistry = isMemberMinistryEligible(currentMinistries);
+      // 2. SE NÃO FOR ADMIN (mesmo sendo Pastor, Líder ou Voluntário):
+      // Verifica elegibilidade: deve ser Pastor OU pertencer aos ministérios autorizados
+      const isEligible = isPastor || isMemberMinistryEligible(currentMinistries);
 
-      if (!isEligibleMinistry) {
+      if (!isEligible) {
         return NextResponse.json(
           {
             ok: false,
             errorType: "NOT_ELIGIBLE_MINISTRY",
             message:
-              "Seu cadastro de membro não possui vínculo com os ministérios 'Bem-vindo (Recepção)', 'A Mais (Diaconia)' ou 'Evangelismo'. Para participar da equipe, procure seu líder de ministério ou atualize seus dados no Portal do Membro.",
+              "Seu cadastro não possui vínculo com a liderança pastoral ou com os ministérios 'Bem-vindo (Recepção)', 'A Mais (Diaconia)' ou 'Evangelismo'. Para participar da equipe, procure a administração ou atualize seus dados no Portal do Membro.",
             memberMinistries: currentMinistries,
           },
           { status: 403 }
         );
       }
 
-      // Pertence aos ministérios: verifica se já tem aprovação na equipe
+      // 3. Verifica se já foi aprovado pelo Admin na equipe
       const teamEntry = data.team.find((t) => t.memberId === memberId);
       if (teamEntry) {
         return NextResponse.json({
           ok: true,
           hasAccess: true,
+          isAdmin: false,
           isPastorOrAdmin: false,
           role: teamEntry.role,
           session: {
@@ -642,13 +681,14 @@ export async function POST(request: Request) {
             name: memberName,
             email: memberEmail,
             phone: memberPhone,
-            isPastor: false,
+            isAdmin: false,
+            isPastor,
             teamRole: teamEntry.role,
           },
         });
       }
 
-      // Não está na equipe aprovada: verifica se tem solicitação pendente
+      // 4. Não está na equipe aprovada: verifica se tem solicitação pendente
       const pendingReq = data.requests.find((r) => r.memberId === memberId && r.status === "pendente");
       if (pendingReq) {
         return NextResponse.json({
@@ -656,7 +696,7 @@ export async function POST(request: Request) {
           hasAccess: false,
           needsApproval: true,
           status: "pendente",
-          message: "Sua solicitação de acesso está aguardando aprovação de um pastor.",
+          message: "Sua solicitação de acesso está aguardando aprovação do administrador.",
           session: {
             id: memberId,
             name: memberName,
@@ -667,15 +707,16 @@ export async function POST(request: Request) {
         });
       }
 
-      // Elegível mas ainda não solicitou acesso
+      // 5. Elegível mas ainda não solicitou acesso (incluindo pastores e líderes)
       return NextResponse.json({
         ok: true,
         hasAccess: false,
         needsApproval: true,
         canRequest: true,
         status: "nao_solicitado",
-        message:
-          "Identificamos que você faz parte dos ministérios de acolhimento! Clique abaixo para solicitar sua liberação de acesso à liderança pastoral.",
+        message: isPastor
+          ? "Identificamos seu perfil pastoral. Por favor, clique abaixo para solicitar a liberação do seu acesso ao administrador."
+          : "Identificamos que você faz parte dos ministérios de acolhimento! Clique abaixo para solicitar sua liberação de acesso ao administrador.",
         session: {
           id: memberId,
           name: memberName,

@@ -191,13 +191,13 @@ export default function CadastroVisitantePage() {
     <main className="min-h-screen bg-[#DCDACF] text-[#252525] py-8 sm:py-12 px-4 sm:px-6 flex flex-col items-center">
       <div className="w-full max-w-xl">
         {/* Top Header & Branding */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-block mb-3">
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+          <div className="mb-3">
             <BrandLogo variant="on-sand" size="md" showTagline={false} />
           </div>
           <div className="inline-flex items-center gap-2 bg-[#CB4B3B] text-white px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm mb-3">
             <Heart className="w-3.5 h-3.5 fill-white" />
-            Ministério Bem-Vindo
+            <span>Ministério Bem-Vindo</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-[#252525] tracking-tight">
             Seja Muito Bem-Vindo(a)!
@@ -372,10 +372,9 @@ export default function CadastroVisitantePage() {
                   onChange={(e) => setServicePeriod(e.target.value)}
                   className="w-full px-3.5 py-3 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm font-medium focus:bg-white focus:border-[#CB4B3B] outline-none"
                 >
-                  <option value="Domingo Noite (18h)">Domingo Noite (18h)</option>
-                  <option value="Domingo Manhã (10h)">Domingo Manhã (10h)</option>
+                  <option value="Domingo (10h)">Domingo (10h)</option>
                   <option value="Quinta-feira (20h)">Quinta-feira (20h)</option>
-                  <option value="Culto Especial">Culto Especial / Conferência</option>
+                  <option value="Outro">Outro</option>
                 </select>
               </div>
 
@@ -461,7 +460,7 @@ export default function CadastroVisitantePage() {
           <p>Igreja do Alto — Lugar de Proteção, Provisão e Direção</p>
           <div className="flex items-center justify-center gap-4 pt-2">
             <Link
-              href="/bem-vindo/portal"
+              href="/bem-vindo"
               className="text-[#CB4B3B] font-bold hover:underline inline-flex items-center gap-1"
             >
               <span>Acesso da Equipe Bem-Vindo</span>

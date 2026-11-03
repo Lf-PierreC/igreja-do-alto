@@ -161,7 +161,7 @@ export interface BemVindosAccessRequest {
   requestedAt: string;
   reviewedBy?: string;
   reviewedAt?: string;
-  role?: "voluntario" | "lider";
+  role?: "voluntario" | "lider" | "pastor";
 }
 
 export interface BemVindosTeamMember {
