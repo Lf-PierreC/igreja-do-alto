@@ -18,134 +18,7 @@ export interface BemVindosDatabaseData {
   team: BemVindosTeamMember[];
 }
 
-const INITIAL_SAMPLE_VISITORS: FirstTimeVisitor[] = [
-  {
-    id: "vis-1",
-    fullName: "Lucas Oliveira de Albuquerque",
-    phone: "(11) 98765-4321",
-    howHeard: "Instagram",
-    howHeardDetail: "Viu um Reels sobre o culto de jovens",
-    churchBackground: "Não frequento nenhuma igreja",
-    visitDate: "2026-10-25",
-    servicePeriod: "Domingo Noite (18h)",
-    neighborhood: "Vila Oliveira",
-    city: "Mogi das Cruzes",
-    prayerRequest: "Pela minha família e direção profissional.",
-    status: "novo",
-    notes: [
-      {
-        id: "note-1",
-        createdAt: "2026-10-25T19:30:00Z",
-        authorName: "Recepção Bem-Vindos",
-        text: "Visitou a igreja pela primeira vez com a noiva. Muito comunicativo.",
-      },
-    ],
-    registeredBy: { type: "self" },
-    createdAt: "2026-10-25T19:30:00Z",
-    updatedAt: "2026-10-25T19:30:00Z",
-  },
-  {
-    id: "vis-2",
-    fullName: "Mariana Santos Ferreira",
-    phone: "(11) 97654-3210",
-    howHeard: "Indicação de Amigo/Familiar",
-    howHeardDetail: "Convidada pela Carol e pelo Pedro",
-    churchBackground: "Estou procurando uma igreja para congregar",
-    visitDate: "2026-10-25",
-    servicePeriod: "Domingo Manhã (10h)",
-    neighborhood: "Alto Ipiranga",
-    city: "Mogi das Cruzes",
-    prayerRequest: "Agradecimento por cura e paz para o coração.",
-    status: "mensagem_enviada",
-    notes: [
-      {
-        id: "note-2a",
-        createdAt: "2026-10-25T11:45:00Z",
-        authorName: "Recepção",
-        text: "Sentou na terceira fileira da nave.",
-      },
-      {
-        id: "note-2b",
-        createdAt: "2026-10-26T14:20:00Z",
-        authorName: "Equipe Bem-Vindo",
-        text: "Mensagem de acolhimento enviada no WhatsApp com devocional.",
-        actionTag: "MENSAGEM_WHATSAPP",
-      },
-    ],
-    registeredBy: { type: "member", memberName: "Camila (Voluntária Bem-Vindo)" },
-    createdAt: "2026-10-25T11:45:00Z",
-    updatedAt: "2026-10-26T14:20:00Z",
-  },
-  {
-    id: "vis-3",
-    fullName: "Guilherme Henrique Prado",
-    phone: "(11) 96543-2109",
-    howHeard: "Passou na Frente da Igreja",
-    howHeardDetail: "Mora a 3 quadras da igreja e ouviu a música",
-    churchBackground: "Estou afastado(a) no momento",
-    visitDate: "2026-10-18",
-    servicePeriod: "Domingo Noite (18h)",
-    neighborhood: "Centro",
-    city: "Mogi das Cruzes",
-    prayerRequest: "Restaurar a comunhão com Deus.",
-    status: "em_conversa",
-    notes: [
-      {
-        id: "note-3a",
-        createdAt: "2026-10-18T19:00:00Z",
-        authorName: "Recepção",
-        text: "Chegou no início da pregação.",
-      },
-      {
-        id: "note-3b",
-        createdAt: "2026-10-19T10:00:00Z",
-        authorName: "Equipe Bem-Vindo",
-        text: "Mensagem enviada no WhatsApp.",
-      },
-      {
-        id: "note-3c",
-        createdAt: "2026-10-20T16:30:00Z",
-        authorName: "Equipe Bem-Vindo",
-        text: "Guilherme respondeu agradecendo o carinho e pediu indicação de um pequeno grupo perto de casa.",
-      },
-    ],
-    registeredBy: { type: "self" },
-    createdAt: "2026-10-18T19:00:00Z",
-    updatedAt: "2026-10-20T16:30:00Z",
-  },
-  {
-    id: "vis-4",
-    fullName: "Juliana Mendes e Família",
-    phone: "(11) 95432-1098",
-    howHeard: "Google / Pesquisa",
-    howHeardDetail: "Pesquisou igreja acolhedora em Mogi",
-    churchBackground: "Sim, sou de outra igreja",
-    otherChurchName: "Igreja Batista de Suzano",
-    visitDate: "2026-10-11",
-    servicePeriod: "Domingo Manhã (10h)",
-    neighborhood: "Mogilar",
-    city: "Mogi das Cruzes",
-    prayerRequest: "Pelos 2 filhos pequenos (Ministério Infantil).",
-    status: "convidado_celula",
-    notes: [
-      {
-        id: "note-4a",
-        createdAt: "2026-10-11T12:00:00Z",
-        authorName: "Equipe Bem-Vindos",
-        text: "Amou a estrutura do Ministério Infantil.",
-      },
-      {
-        id: "note-4b",
-        createdAt: "2026-10-14T11:00:00Z",
-        authorName: "Equipe Bem-Vindos",
-        text: "Conectada com a Casa do Alto do bairro Mogilar (Líder Marcos).",
-      },
-    ],
-    registeredBy: { type: "member", memberName: "Recepção Bem-Vindos" },
-    createdAt: "2026-10-11T12:00:00Z",
-    updatedAt: "2026-10-14T11:00:00Z",
-  },
-];
+const INITIAL_SAMPLE_VISITORS: FirstTimeVisitor[] = [];
 
 function readRawLocalDb(): any {
   try {
@@ -170,15 +43,15 @@ function writeRawLocalDb(data: any) {
 
 export function readBemVindosLocal(): BemVindosDatabaseData {
   const rawDb = readRawLocalDb();
-  let visitors = rawDb.firstTimeVisitors || [];
-  let requests = rawDb.bemVindosRequests || [];
-  let team = rawDb.bemVindosTeam || [];
-
-  if (!Array.isArray(visitors) || visitors.length === 0) {
-    visitors = INITIAL_SAMPLE_VISITORS;
-    rawDb.firstTimeVisitors = visitors;
-    writeRawLocalDb(rawDb);
-  }
+  const visitors: FirstTimeVisitor[] = Array.isArray(rawDb.firstTimeVisitors)
+    ? rawDb.firstTimeVisitors
+    : [];
+  const requests: BemVindosAccessRequest[] = Array.isArray(rawDb.bemVindosRequests)
+    ? rawDb.bemVindosRequests
+    : [];
+  const team: BemVindosTeamMember[] = Array.isArray(rawDb.bemVindosTeam)
+    ? rawDb.bemVindosTeam
+    : [];
 
   return { visitors, requests, team };
 }

@@ -883,82 +883,143 @@ export default function BemVindoPortalPage() {
             </div>
 
             {/* Barra de Filtros */}
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* Campo de Busca */}
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome, WhatsApp, igreja anterior, bairro..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-sm focus:bg-white focus:border-[#CB4B3B] outline-none"
-                  />
-                  {searchTerm && (
-                    <button
-                      onClick={() => setSearchTerm("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3.5">
+              {/* Linha 1: Campo de Busca com largura total */}
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, WhatsApp, igreja anterior, bairro..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-10 py-3 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-sm focus:bg-white focus:border-[#CB4B3B] focus:ring-2 focus:ring-[#CB4B3B]/10 outline-none transition"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1"
+                    title="Limpar busca"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Linha 2: Grid dos 4 Filtros Selecionadores */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {/* Filtro de Status */}
+                <div className="relative">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition appearance-none pr-8 cursor-pointer ${
+                      filterStatus !== "todos"
+                        ? "bg-amber-50/80 border-amber-300 text-amber-950 font-bold"
+                        : "bg-[#F7F6F2] border-stone-200 text-stone-900 hover:bg-stone-100/70"
+                    }`}
+                  >
+                    <option value="todos" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Todos os Status
+                    </option>
+                    {VISITOR_STATUSES.map((st) => (
+                      <option
+                        key={st.id}
+                        value={st.id}
+                        className="bg-white text-stone-900"
+                        style={{ backgroundColor: "#ffffff", color: "#1c1917" }}
+                      >
+                        {st.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
                 </div>
 
-                {/* Filtro de Status */}
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-xs sm:text-sm font-semibold focus:bg-white focus:border-[#CB4B3B] outline-none"
-                >
-                  <option value="todos">Todos os Status</option>
-                  {VISITOR_STATUSES.map((st) => (
-                    <option key={st.id} value={st.id}>
-                      {st.label}
-                    </option>
-                  ))}
-                </select>
-
                 {/* Filtro de Vínculo com Igreja */}
-                <select
-                  value={filterChurchBg}
-                  onChange={(e) => setFilterChurchBg(e.target.value)}
-                  className="px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-xs sm:text-sm font-semibold focus:bg-white focus:border-[#CB4B3B] outline-none"
-                >
-                  <option value="todos">Todas as Igrejas/Vínculos</option>
-                  {CHURCH_BACKGROUND_OPTIONS.map((ch) => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.label}
+                <div className="relative">
+                  <select
+                    value={filterChurchBg}
+                    onChange={(e) => setFilterChurchBg(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition appearance-none pr-8 cursor-pointer ${
+                      filterChurchBg !== "todos"
+                        ? "bg-stone-100 border-stone-400 text-stone-900 font-bold"
+                        : "bg-[#F7F6F2] border-stone-200 text-stone-900 hover:bg-stone-100/70"
+                    }`}
+                  >
+                    <option value="todos" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Todas as Igrejas/Vínculos
                     </option>
-                  ))}
-                </select>
+                    {CHURCH_BACKGROUND_OPTIONS.map((ch) => (
+                      <option
+                        key={ch.id}
+                        value={ch.id}
+                        className="bg-white text-stone-900"
+                        style={{ backgroundColor: "#ffffff", color: "#1c1917" }}
+                      >
+                        {ch.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
 
                 {/* Filtro de Canal de Origem */}
-                <select
-                  value={filterChannel}
-                  onChange={(e) => setFilterChannel(e.target.value)}
-                  className="px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-xs sm:text-sm font-semibold focus:bg-white focus:border-[#CB4B3B] outline-none"
-                >
-                  <option value="todos">Todos os Canais</option>
-                  {HOW_HEARD_OPTIONS.map((ch) => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.label}
+                <div className="relative">
+                  <select
+                    value={filterChannel}
+                    onChange={(e) => setFilterChannel(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition appearance-none pr-8 cursor-pointer ${
+                      filterChannel !== "todos"
+                        ? "bg-stone-100 border-stone-400 text-stone-900 font-bold"
+                        : "bg-[#F7F6F2] border-stone-200 text-stone-900 hover:bg-stone-100/70"
+                    }`}
+                  >
+                    <option value="todos" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Todos os Canais
                     </option>
-                  ))}
-                </select>
+                    {HOW_HEARD_OPTIONS.map((ch) => (
+                      <option
+                        key={ch.id}
+                        value={ch.id}
+                        className="bg-white text-stone-900"
+                        style={{ backgroundColor: "#ffffff", color: "#1c1917" }}
+                      >
+                        {ch.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
 
                 {/* Filtro de Período */}
-                <select
-                  value={filterDatePreset}
-                  onChange={(e) => setFilterDatePreset(e.target.value)}
-                  className="px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-200 rounded-xl text-stone-900 text-xs sm:text-sm font-semibold focus:bg-white focus:border-[#CB4B3B] outline-none"
-                >
-                  <option value="todos">Todas as Datas</option>
-                  <option value="hoje">Hoje</option>
-                  <option value="ultimos_7">Últimos 7 dias</option>
-                  <option value="ultimos_30">Últimos 30 dias</option>
-                  <option value="personalizado">Data Personalizada</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={filterDatePreset}
+                    onChange={(e) => setFilterDatePreset(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition appearance-none pr-8 cursor-pointer ${
+                      filterDatePreset !== "todos"
+                        ? "bg-stone-100 border-stone-400 text-stone-900 font-bold"
+                        : "bg-[#F7F6F2] border-stone-200 text-stone-900 hover:bg-stone-100/70"
+                    }`}
+                  >
+                    <option value="todos" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Todas as Datas
+                    </option>
+                    <option value="hoje" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Hoje
+                    </option>
+                    <option value="ultimos_7" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Últimos 7 dias
+                    </option>
+                    <option value="ultimos_30" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Últimos 30 dias
+                    </option>
+                    <option value="personalizado" className="bg-white text-stone-900" style={{ backgroundColor: "#ffffff", color: "#1c1917" }}>
+                      Data Personalizada
+                    </option>
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
               </div>
 
               {/* Data personalizada se selecionada */}
@@ -1025,7 +1086,12 @@ export default function BemVindoPortalPage() {
                               className={`text-[11px] font-extrabold uppercase px-2.5 py-1 rounded-full border cursor-pointer outline-none transition appearance-none pr-6 ${statusMeta.badgeBg} ${statusMeta.badgeText}`}
                             >
                               {VISITOR_STATUSES.map((st) => (
-                                <option key={st.id} value={st.id}>
+                                <option
+                                  key={st.id}
+                                  value={st.id}
+                                  className="bg-white text-stone-900 py-1.5 font-semibold"
+                                  style={{ backgroundColor: "#ffffff", color: "#1c1917" }}
+                                >
                                   {st.label}
                                 </option>
                               ))}
