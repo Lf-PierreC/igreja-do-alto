@@ -1487,7 +1487,7 @@ export default function PortalDoMembroPage() {
   // =========================================================================
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#DCDACF] flex flex-col justify-between text-[#252525]">
+      <div className="min-h-screen bg-[#DCDACF] flex flex-col justify-between text-[#252525] overflow-x-hidden">
         {/* Top Header */}
         <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
@@ -2258,34 +2258,34 @@ export default function PortalDoMembroPage() {
   // TELA LOGADO: PORTAL DO MEMBRO & NÚCLEO FAMILIAR
   // =========================================================================
   return (
-    <div className="min-h-screen bg-[#DCDACF] flex flex-col justify-between text-[#252525]">
+    <div className="min-h-screen bg-[#DCDACF] flex flex-col justify-between text-[#252525] overflow-x-hidden">
       {/* Top Header do Portal */}
       <header className="bg-[#252525] text-[#DCDACF] border-b-4 border-[#CB4B3B] sticky top-0 z-30 shadow-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <BrandLogo variant="on-dark2" size="sm" />
             <span className="hidden sm:inline-block w-px h-6 bg-[#DCDACF]/20" />
-            <span className="text-xs font-black uppercase tracking-wider text-[#CB4B3B]">
+            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#CB4B3B] truncate">
               Portal do Membro
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="flex items-center justify-end gap-2">
-                <span className="block text-xs font-black uppercase text-white">
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto max-w-full min-w-0">
+            <div className="text-right min-w-0 flex-1">
+              <div className="flex items-center justify-end gap-1.5 sm:gap-2 min-w-0">
+                <span className="block text-[11px] sm:text-xs font-black uppercase text-white truncate max-w-[140px] sm:max-w-none">
                   {session.name}
                 </span>
                 {session.isAdmin ? (
-                  <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                  <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
                     👑 Admin
                   </span>
                 ) : session.isPastor ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider">
+                  <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider">
                     🤝 Pastor
                   </span>
                 ) : session.isLeader ? (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-black uppercase tracking-wider">
+                  <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-black uppercase tracking-wider">
                     ⭐ Líder
                   </span>
                 ) : null}
@@ -2296,7 +2296,7 @@ export default function PortalDoMembroPage() {
               <button
                 type="button"
                 onClick={() => handleOpenVisitsPortal("agenda")}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3D3D3D] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3D3D3D] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider transition-colors shadow-sm shrink-0 whitespace-nowrap"
                 title="Abrir o Portal de Visitas"
               >
                 <ClipboardCheck className="w-3.5 h-3.5 text-[#EBD57B]" />
@@ -2308,7 +2308,7 @@ export default function PortalDoMembroPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold transition-colors"
+              className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#363636] hover:bg-[#CB4B3B] text-[#DCDACF] text-xs font-bold transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sair</span>
@@ -2323,7 +2323,7 @@ export default function PortalDoMembroPage() {
               e.currentTarget.scrollLeft += e.deltaY;
             }
           }}
-          className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 custom-scrollbar-dark scroll-smooth"
+          className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 custom-scrollbar-dark scroll-smooth"
         >
           {(() => {
             const tabs: {
@@ -2412,24 +2412,24 @@ export default function PortalDoMembroPage() {
       </header>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="flex-1 max-w-6xl w-full min-w-0 mx-auto px-3 sm:px-6 py-5 sm:py-8 space-y-6">
         {/* Notificação Global: Solicitação de Vínculo de Cônjuge Pendente */}
         {memberData?.pendingSpouseLink && (
           <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFBEB] border-2 border-amber-400 text-[#252525] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
-            <div className="flex items-start sm:items-center gap-3">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow">
                 <Bell className="w-5 h-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <strong className="block text-sm font-black uppercase text-amber-950">
                   💍 Solicitação de Vínculo de Cônjuge
                 </strong>
-                <p className="text-xs sm:text-sm text-amber-900 font-medium">
+                <p className="text-xs sm:text-sm text-amber-900 font-medium break-words">
                   <strong>{memberData.pendingSpouseLink.requesterName}</strong> solicitou vincular o cadastro com você como esposo(a) para unir o núcleo familiar e filhos.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleAcceptSpouseLink}
@@ -2459,18 +2459,18 @@ export default function PortalDoMembroPage() {
                 : "bg-[#F9EAE8] text-[#A93829] border-[#CB4B3B]"
             }`}
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               {adminFeedback.type === "success" ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
               ) : (
                 <AlertCircle className="w-5 h-5 text-[#CB4B3B] shrink-0" />
               )}
-              <span>{adminFeedback.text}</span>
+              <span className="break-words">{adminFeedback.text}</span>
             </div>
             <button
               type="button"
               onClick={() => setAdminFeedback(null)}
-              className="text-current opacity-70 hover:opacity-100 p-1"
+              className="text-current opacity-70 hover:opacity-100 p-1 shrink-0"
               title="Fechar aviso"
             >
               <X className="w-4 h-4" />
@@ -2484,15 +2484,15 @@ export default function PortalDoMembroPage() {
         {activeTab === "familia" && (
           <div className="space-y-6">
             {/* Banner do Núcleo Familiar */}
-            <div className="rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-md border border-[#252525]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
+            <div className="rounded-3xl bg-[#F4F3EE] p-5 sm:p-8 shadow-md border border-[#252525]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="min-w-0">
                 <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
                   Núcleo Familiar Registrado
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-[#252525] mt-1">
+                <h2 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-[#252525] mt-1 break-words">
                   Família {memberData?.spouseName ? `${memberData.name.split(" ")[0]} & ${memberData.spouseName.split(" ")[0]}` : memberData?.name}
                 </h2>
-                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1">
+                <p className="text-xs sm:text-sm text-[#252525]/75 font-medium mt-1 break-words">
                   {formatAddress(memberData?.address)}
                 </p>
               </div>
@@ -2500,22 +2500,22 @@ export default function PortalDoMembroPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("solicitar-visita")}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors shrink-0"
               >
-                <HeartHandshake className="w-4 h-4" />
+                <HeartHandshake className="w-4 h-4 shrink-0" />
                 <span>Solicitar Visita para Nossa Casa</span>
               </button>
             </div>
 
             {/* SEÇÃO: CÔNJUGE (Marido & Esposa) */}
-            <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/10 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-[#252525]/15">
+            <div className="rounded-3xl bg-[#F4F3EE] p-5 sm:p-6 shadow-md border border-[#252525]/10 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#252525]/15">
                 <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[#252525]">
-                  <Heart className="w-5 h-5 text-[#CB4B3B]" />
+                  <Heart className="w-5 h-5 text-[#CB4B3B] shrink-0" />
                   <span>Vínculo de Cônjuge (Marido / Esposa)</span>
                 </div>
                 {spouseData && (
-                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black uppercase tracking-wider">
+                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black uppercase tracking-wider shrink-0 whitespace-nowrap">
                     ✓ Vínculo Ativo
                   </span>
                 )}
@@ -2524,15 +2524,15 @@ export default function PortalDoMembroPage() {
               {spouseData ? (
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl bg-white border-2 border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-lg">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-lg shrink-0">
                         {spouseData.name.charAt(0)}
                       </div>
-                      <div>
-                        <strong className="block text-base font-black text-[#252525]">
+                      <div className="min-w-0 flex-1">
+                        <strong className="block text-sm sm:text-base font-black text-[#252525] break-words">
                           {spouseData.name}
                         </strong>
-                        <span className="block text-xs font-semibold text-[#252525]/70">
+                        <span className="block text-xs font-semibold text-[#252525]/70 break-all">
                           {spouseData.phone} {spouseData.email ? `• ${spouseData.email}` : ""}
                         </span>
                       </div>
@@ -2569,20 +2569,20 @@ export default function PortalDoMembroPage() {
                 </div>
               ) : memberData?.pendingSpouseLink ? (
                 <div className="space-y-4">
-                  <div className="p-5 rounded-2xl bg-[#FFFBEB] border-2 border-amber-400 space-y-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow">
-                          <Bell className="w-6 h-6" />
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FFFBEB] border-2 border-amber-400 space-y-4 shadow-sm overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow shrink-0">
+                          <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <span className="text-xs font-black uppercase tracking-wider text-amber-800">
                             Solicitação de Vínculo Recebida
                           </span>
-                          <strong className="block text-base font-black text-[#252525]">
+                          <strong className="block text-sm sm:text-base font-black text-[#252525] break-words leading-snug">
                             {memberData.pendingSpouseLink.requesterName}
                           </strong>
-                          <span className="block text-xs font-semibold text-[#252525]/70">
+                          <span className="block text-xs font-semibold text-[#252525]/70 break-all mt-0.5">
                             {memberData.pendingSpouseLink.requesterPhone || ""}{" "}
                             {memberData.pendingSpouseLink.requesterEmail
                               ? `• ${memberData.pendingSpouseLink.requesterEmail}`
@@ -2590,12 +2590,12 @@ export default function PortalDoMembroPage() {
                           </span>
                         </div>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-black uppercase tracking-wider shrink-0">
+                      <span className="self-start px-2.5 py-1 rounded-full bg-amber-200 text-amber-900 text-[10px] sm:text-xs font-black uppercase tracking-wider shrink-0 whitespace-nowrap">
                         Aguardando Você
                       </span>
                     </div>
 
-                    <p className="text-xs sm:text-sm text-[#252525]/85 leading-relaxed font-medium">
+                    <p className="text-xs sm:text-sm text-[#252525]/85 leading-relaxed font-medium break-words">
                       <strong>{memberData.pendingSpouseLink.requesterName}</strong> solicitou vincular o cadastro com você como esposo(a). Ao aceitar, vocês compartilharão o mesmo núcleo familiar, endereço residencial e a lista de filhos no cuidado pastoral.
                     </p>
 
@@ -2635,32 +2635,32 @@ export default function PortalDoMembroPage() {
                 </div>
               ) : memberData?.sentSpouseLinkRequest ? (
                 <div className="space-y-4">
-                  <div className="p-5 rounded-2xl bg-white border-2 border-amber-300/60 space-y-3 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-black text-lg">
-                          <Clock3 className="w-6 h-6 text-amber-600" />
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-amber-300/60 space-y-3 shadow-sm overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-black text-lg shrink-0">
+                          <Clock3 className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <span className="text-xs font-black uppercase tracking-wider text-amber-800">
                             Solicitação Enviada
                           </span>
-                          <strong className="block text-base font-black text-[#252525]">
+                          <strong className="block text-sm sm:text-base font-black text-[#252525] break-words leading-snug">
                             {memberData.sentSpouseLinkRequest.targetName}
                           </strong>
-                          <span className="block text-xs font-semibold text-[#252525]/70">
+                          <span className="block text-xs font-semibold text-[#252525]/70 break-all mt-0.5">
                             {memberData.sentSpouseLinkRequest.targetEmail
                               ? memberData.sentSpouseLinkRequest.targetEmail
                               : "Aguardando confirmação"}
                           </span>
                         </div>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black uppercase tracking-wider shrink-0">
+                      <span className="self-start px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] sm:text-xs font-black uppercase tracking-wider shrink-0 whitespace-nowrap">
                         ⏳ Pendente
                       </span>
                     </div>
 
-                    <p className="text-xs sm:text-sm text-[#252525]/80 font-medium leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[#252525]/80 font-medium leading-relaxed break-words">
                       Uma notificação foi enviada para o portal de <strong>{memberData.sentSpouseLinkRequest.targetName}</strong>. Assim que ele(a) acessar e aceitar o vínculo, seus perfis e os filhos serão conectados automaticamente.
                     </p>
 
@@ -3040,7 +3040,7 @@ export default function PortalDoMembroPage() {
 
                   {/* Endereço da Visita */}
                   <div className="p-4 rounded-2xl bg-white border-2 border-[#252525]/15 space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <span className="text-xs font-black uppercase tracking-wider text-[#252525]">
                         Local da Visita
                       </span>
@@ -3049,7 +3049,7 @@ export default function PortalDoMembroPage() {
                           type="checkbox"
                           checked={useCustomAddress}
                           onChange={(e) => setUseCustomAddress(e.target.checked)}
-                          className="w-4 h-4 rounded"
+                          className="w-4 h-4 rounded shrink-0"
                         />
                         <span>Será em outro endereço (ex: hospital, empresa, trabalho)</span>
                       </label>
@@ -3060,8 +3060,8 @@ export default function PortalDoMembroPage() {
                         {formatAddress(memberData?.address)}
                       </p>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2 pt-2">
-                        <div className="col-span-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                        <div className="sm:col-span-2">
                           <input
                             type="text"
                             required
@@ -3081,7 +3081,7 @@ export default function PortalDoMembroPage() {
                             className="w-full rounded-xl border border-[#252525]/30 p-2 text-xs font-semibold"
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="sm:col-span-2">
                           <input
                             type="text"
                             required
@@ -3143,12 +3143,12 @@ export default function PortalDoMembroPage() {
            =================================================================== */}
         {activeTab === "minhas-solicitacoes" && (
           <div className="space-y-4">
-            <div className="rounded-3xl bg-[#F4F3EE] p-6 shadow-md border border-[#252525]/10 flex items-center justify-between">
+            <div className="rounded-3xl bg-[#F4F3EE] p-5 sm:p-6 shadow-md border border-[#252525]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
                   Histórico Pastoral
                 </span>
-                <h2 className="text-2xl font-black uppercase text-[#252525]">
+                <h2 className="text-xl sm:text-2xl font-black uppercase text-[#252525]">
                   Solicitações da Família ({myRequests.length})
                 </h2>
               </div>
@@ -3156,7 +3156,7 @@ export default function PortalDoMembroPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("solicitar-visita")}
-                className="px-4 py-2.5 rounded-xl bg-[#CB4B3B] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow"
+                className="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-[#CB4B3B] hover:bg-[#A93829] text-[#DCDACF] text-xs font-black uppercase tracking-wider shadow transition-colors shrink-0 whitespace-nowrap"
               >
                 + Nova Solicitação
               </button>
@@ -3233,13 +3233,13 @@ export default function PortalDoMembroPage() {
             ABA 4: MEU CADASTRO
            =================================================================== */}
         {activeTab === "meu-cadastro" && memberData && (
-          <div className="max-w-2xl mx-auto rounded-3xl bg-[#F4F3EE] p-6 sm:p-8 shadow-xl border border-[#252525]/15 space-y-6">
+          <div className="max-w-2xl mx-auto rounded-3xl bg-[#F4F3EE] p-5 sm:p-8 shadow-xl border border-[#252525]/15 space-y-6">
             <div className="pb-3 border-b border-[#252525]/15 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <span className="text-xs font-extrabold uppercase tracking-widest text-[#CB4B3B]">
                   Dados Cadastrais
                 </span>
-                <h2 className="text-2xl font-black uppercase text-[#252525]">
+                <h2 className="text-xl sm:text-2xl font-black uppercase text-[#252525]">
                   Meu Perfil de Membro
                 </h2>
               </div>
@@ -3281,16 +3281,16 @@ export default function PortalDoMembroPage() {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-black text-[#252525] truncate">
+                      <h3 className="text-base font-black text-[#252525] break-words">
                         {memberData.name}
                       </h3>
                       {memberData.isAdmin && (
-                        <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase">
+                        <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase shrink-0 whitespace-nowrap">
                           👑 Admin
                         </span>
                       )}
                       {memberData.isPastor && !memberData.isAdmin && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black uppercase shrink-0 whitespace-nowrap">
                           🤝 Pastor
                         </span>
                       )}
@@ -3302,28 +3302,28 @@ export default function PortalDoMembroPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-[#252525]">
-                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10 min-w-0">
                     <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
                       Nome Completo
                     </span>
-                    <strong className="text-sm font-black">{memberData.name}</strong>
+                    <strong className="text-sm font-black break-words">{memberData.name}</strong>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10 min-w-0">
                     <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
                       CPF (Chave Única)
                     </span>
                     <strong className="text-sm font-black">{formatCPF(memberData.cpf)}</strong>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10 min-w-0">
                     <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
                       E-mail de Acesso
                     </span>
-                    <strong className="text-sm font-black">{memberData.email || "Não informado"}</strong>
+                    <strong className="text-sm font-black break-all">{memberData.email || "Não informado"}</strong>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#252525]/10 min-w-0">
                     <span className="block text-[10px] font-black uppercase text-[#252525]/60 mb-0.5">
                       Telefone / WhatsApp
                     </span>
@@ -3407,9 +3407,9 @@ export default function PortalDoMembroPage() {
 
                 {/* Bloco de Ministérios em Visualização */}
                 <div className="p-4 rounded-2xl bg-white border border-[#252525]/15 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#252525]/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#252525]/10">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#CB4B3B]" />
+                      <Sparkles className="w-4 h-4 text-[#CB4B3B] shrink-0" />
                       <h3 className="text-xs font-black uppercase tracking-wide text-[#252525]">
                         Envolvimento em Ministérios
                       </h3>
@@ -3690,8 +3690,8 @@ export default function PortalDoMembroPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
                       <label className="block text-[11px] font-bold text-[#252525]/80 mb-1">
                         Logradouro (Rua / Av.)
                       </label>
@@ -4358,7 +4358,7 @@ export default function PortalDoMembroPage() {
 
               {/* Se for Admin: seletor de visualização (Relatório vs Formulário de Interesse) */}
               {session.isAdmin && (
-                <div className="flex bg-[#252525] p-1.5 rounded-2xl gap-1 shrink-0">
+                <div className="flex flex-col sm:flex-row bg-[#252525] p-1.5 rounded-2xl gap-1 w-full md:w-auto shrink-0">
                   <button
                     type="button"
                     onClick={() => setMinistryViewMode("relatorio")}
@@ -4558,24 +4558,24 @@ export default function PortalDoMembroPage() {
                       return (
                         <div
                           key={m.id}
-                          className="p-5 rounded-2xl bg-white border border-[#252525]/15 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                          className="p-5 rounded-2xl bg-white border border-[#252525]/15 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden"
                         >
-                          <div className="space-y-2 flex-1">
+                          <div className="space-y-2 flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedMemberDetail(m)}
-                                className="text-base font-black text-[#252525] hover:text-[#CB4B3B] text-left transition-colors flex items-center gap-1.5"
+                                className="text-base font-black text-[#252525] hover:text-[#CB4B3B] text-left transition-colors flex items-center gap-1.5 break-words"
                               >
                                 <span>{m.name}</span>
                               </button>
                               {isAdmin && (
-                                <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider">
+                                <span className="px-2 py-0.5 rounded-full bg-[#CB4B3B] text-white text-[10px] font-black uppercase tracking-wider shrink-0 whitespace-nowrap">
                                   👑 Admin Total
                                 </span>
                               )}
                               {isPastor && !isAdmin && (
-                                <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider">
+                                <span className="px-2 py-0.5 rounded-full bg-[#252525] text-white text-[10px] font-black uppercase tracking-wider shrink-0 whitespace-nowrap">
                                   🤝 Pastor
                                 </span>
                               )}
@@ -4587,19 +4587,19 @@ export default function PortalDoMembroPage() {
                             <div className="flex flex-wrap items-center gap-3 text-xs text-[#252525]/75 font-semibold">
                               {m.phone && (
                                 <div className="flex items-center gap-1">
-                                  <Phone className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                                  <Phone className="w-3.5 h-3.5 text-[#CB4B3B] shrink-0" />
                                   <span>{formatPhoneBR(m.phone)}</span>
                                 </div>
                               )}
                               {m.email && (
-                                <div className="flex items-center gap-1">
-                                  <Mail className="w-3.5 h-3.5 text-[#252525]/50" />
-                                  <span>{m.email}</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <Mail className="w-3.5 h-3.5 text-[#252525]/50 shrink-0" />
+                                  <span className="break-all">{m.email}</span>
                                 </div>
                               )}
                               {m.address?.neighborhood && (
                                 <div className="flex items-center gap-1 text-[#252525]/60">
-                                  <MapPin className="w-3.5 h-3.5 text-[#252525]/40" />
+                                  <MapPin className="w-3.5 h-3.5 text-[#252525]/40 shrink-0" />
                                   <span>{m.address.neighborhood}, {m.address.city || "Mogi das Cruzes"}</span>
                                 </div>
                               )}
@@ -5131,36 +5131,36 @@ export default function PortalDoMembroPage() {
                   return (
                     <div
                       key={m.id}
-                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-3"
+                      className="p-5 rounded-3xl bg-white border-2 border-[#252525]/10 shadow-sm space-y-3 overflow-hidden"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-base font-black text-[#252525]">{m.name}</h4>
+                            <h4 className="text-base font-black text-[#252525] break-words">{m.name}</h4>
                             {m.isPastor && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#252525] text-[#DCDACF]">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#252525] text-[#DCDACF] shrink-0 whitespace-nowrap">
                                 🤝 Pastor(a)
                               </span>
                             )}
                             {m.isLeader && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white shrink-0 whitespace-nowrap">
                                 ⭐ Líder
                               </span>
                             )}
                             {m.isAdmin && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#CB4B3B] text-white">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#CB4B3B] text-white shrink-0 whitespace-nowrap">
                                 👑 Admin
                               </span>
                             )}
                           </div>
-                          <span className="text-xs font-bold text-[#252525]/60 block mt-1">
+                          <span className="text-xs font-bold text-[#252525]/60 block mt-1 break-all">
                             {m.phone ? formatPhoneBR(m.phone) : m.email || "Sem telefone"}
                           </span>
                         </div>
 
-                        <div className="text-right">
+                        <div className="sm:text-right shrink-0">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
                               m.isVisitorActive !== false
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "bg-stone-200 text-stone-600"
@@ -5172,9 +5172,9 @@ export default function PortalDoMembroPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#252525]/80 bg-[#F4F3EE] p-2.5 rounded-xl">
-                        <span className="inline-flex items-center gap-1">
-                          <KeyRound className="w-3.5 h-3.5 text-[#CB4B3B]" />
-                          Login de acesso: <strong>{m.cpf ? formatCPF(m.cpf) : m.email || m.name}</strong>
+                        <span className="inline-flex items-center gap-1 break-all">
+                          <KeyRound className="w-3.5 h-3.5 text-[#CB4B3B] shrink-0" />
+                          <span>Login de acesso: <strong>{m.cpf ? formatCPF(m.cpf) : m.email || m.name}</strong></span>
                         </span>
                       </div>
 
