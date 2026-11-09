@@ -4759,7 +4759,7 @@ export default function PortalDoMembroPage() {
                                     {isChecked && <Star className="w-3.5 h-3.5 fill-white" />}
                                   </div>
                                   <div className="space-y-0.5">
-                                    <span className="block text-xs sm:text-sm font-bold leading-snug text-[#252525]">http://localhost:3000/bem-vindo/cadastro
+                                    <span className="block text-xs sm:text-sm font-bold leading-snug text-[#252525]">
                                       {item.label}
                                     </span>
                                     {item.description && (
