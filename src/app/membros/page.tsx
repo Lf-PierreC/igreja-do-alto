@@ -2165,15 +2165,27 @@ export default function PortalDoMembroPage() {
     );
   }
 
+  const normalizeSearchText = (value?: string | null) =>
+    (value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+
   const filteredMembers = allMembers.filter((m) => {
-    const q = memberSearchQuery.toLowerCase().trim();
-    const cleanQ = cleanDigits(q);
+    const q = normalizeSearchText(memberSearchQuery);
+    const cleanQ = cleanDigits(memberSearchQuery);
     const matchesQuery =
       !q ||
-      m.name.toLowerCase().includes(q) ||
-      (m.cpf && cleanDigits(m.cpf).includes(cleanQ)) ||
-      (m.phone && m.phone.includes(q)) ||
-      (m.email && m.email.toLowerCase().includes(q));
+      normalizeSearchText(m.name).includes(q) ||
+      (cleanQ.length > 0 && Boolean(m.cpf && cleanDigits(m.cpf).includes(cleanQ))) ||
+      Boolean(
+        m.phone &&
+          (normalizeSearchText(m.phone).includes(q) ||
+            (cleanQ.length > 0 && cleanDigits(m.phone).includes(cleanQ)))
+      ) ||
+      Boolean(m.email && normalizeSearchText(m.email).includes(q)) ||
+      Boolean(m.address?.neighborhood && normalizeSearchText(m.address.neighborhood).includes(q));
 
     if (!matchesQuery) return false;
 
@@ -2182,14 +2194,14 @@ export default function PortalDoMembroPage() {
     }
     if (memberFilterCategory === "pastores") {
       return Boolean(
-        m.isPastor || m.portalRole === "pastor" || m.portalRole === "admin"
+        m.isPastor || m.isLeader || m.portalRole === "pastor" || m.portalRole === "admin"
       );
     }
     if (memberFilterCategory === "admins") {
       return Boolean(m.isAdmin || m.portalRole === "admin");
     }
     if (memberFilterCategory === "visitantes") {
-      return m.relationship !== "Membro";
+      return m.relationship !== "Membro" && !m.isOfficialMember;
     }
     return true;
   });
@@ -2222,13 +2234,19 @@ export default function PortalDoMembroPage() {
     }
 
     // Search query
-    const q = ministrySearchQuery.toLowerCase().trim();
+    const q = normalizeSearchText(ministrySearchQuery);
+    const cleanQ = cleanDigits(ministrySearchQuery);
     if (!q) return true;
     return (
-      m.name.toLowerCase().includes(q) ||
-      (m.phone && m.phone.includes(q)) ||
-      current.some((min) => min.toLowerCase().includes(q)) ||
-      interested.some((min) => min.toLowerCase().includes(q))
+      normalizeSearchText(m.name).includes(q) ||
+      Boolean(
+        m.phone &&
+          (normalizeSearchText(m.phone).includes(q) ||
+            (cleanQ.length > 0 && cleanDigits(m.phone).includes(cleanQ)))
+      ) ||
+      Boolean(m.email && normalizeSearchText(m.email).includes(q)) ||
+      current.some((min) => normalizeSearchText(min).includes(q)) ||
+      interested.some((min) => normalizeSearchText(min).includes(q))
     );
   });
 
@@ -2242,12 +2260,18 @@ export default function PortalDoMembroPage() {
     (m) => m.id !== "admin-master"
   );
   const matchingMembersToAppoint = eligibleMembersToAppoint.filter((m) => {
-    const q = appointSearchQuery.toLowerCase().trim();
+    const q = normalizeSearchText(appointSearchQuery);
+    const cleanQ = cleanDigits(appointSearchQuery);
     if (!q) return false;
     return (
-      m.name.toLowerCase().includes(q) ||
-      (m.phone && m.phone.includes(q)) ||
-      (m.email && m.email.toLowerCase().includes(q))
+      normalizeSearchText(m.name).includes(q) ||
+      (cleanQ.length > 0 && Boolean(m.cpf && cleanDigits(m.cpf).includes(cleanQ))) ||
+      Boolean(
+        m.phone &&
+          (normalizeSearchText(m.phone).includes(q) ||
+            (cleanQ.length > 0 && cleanDigits(m.phone).includes(cleanQ)))
+      ) ||
+      Boolean(m.email && normalizeSearchText(m.email).includes(q))
     );
   });
   const selectedMemberObj = allMembers.find(
@@ -4117,7 +4141,7 @@ export default function PortalDoMembroPage() {
                   Pastores & Líderes
                 </span>
                 <span className="text-2xl font-black text-[#CB4B3B]">
-                  {allMembers.filter((m) => m.isPastor).length}
+                  {allMembers.filter((m) => m.isPastor || m.isLeader).length}
                 </span>
               </div>
               <div className="p-4 rounded-2xl bg-white border border-[#252525]/10 shadow-sm">
@@ -4133,14 +4157,24 @@ export default function PortalDoMembroPage() {
             {/* Barra de Filtros e Busca */}
             <div className="p-4 rounded-2xl bg-[#F4F3EE] border border-[#252525]/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[#252525]/50 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
                   placeholder="Pesquisar por nome, CPF, telefone ou e-mail..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold text-[#252525] placeholder-[#252525]/40"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border-2 border-[#252525]/20 bg-white text-xs sm:text-sm font-semibold text-[#252525] placeholder-[#252525]/40"
                 />
+                {memberSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setMemberSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#252525]/40 hover:text-[#252525] p-1"
+                    title="Limpar pesquisa"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
