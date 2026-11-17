@@ -26,6 +26,12 @@ export const CHURCH_BACKGROUND_OPTIONS = [
 
 export type ChurchBackgroundOption = (typeof CHURCH_BACKGROUND_OPTIONS)[number]["id"];
 
+export const SERVICE_PERIOD_OPTIONS = [
+  "Domingo Manhã (10h)",
+  "Quinta-feira (20h)",
+  "Outro",
+] as const;
+
 
 export type VisitorStatus =
   | "novo"

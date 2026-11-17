@@ -121,11 +121,81 @@ export async function GET(request: Request) {
 
     const channelBreakdown: Record<string, number> = {};
     const statusBreakdown: Record<string, number> = {};
+    const churchBackgroundBreakdown: Record<string, number> = {};
+    const servicePeriodBreakdown: Record<string, number> = {};
+    const monthlyCounts: Record<string, number> = {};
+
+    let totalContactMinutes = 0;
+    let firstContactCount = 0;
 
     visitors.forEach((v) => {
       channelBreakdown[v.howHeard] = (channelBreakdown[v.howHeard] || 0) + 1;
       statusBreakdown[v.status] = (statusBreakdown[v.status] || 0) + 1;
+
+      const bgKey = v.churchBackground || "Não informado";
+      churchBackgroundBreakdown[bgKey] = (churchBackgroundBreakdown[bgKey] || 0) + 1;
+
+      const periodKey = v.servicePeriod || "Não informado";
+      servicePeriodBreakdown[periodKey] = (servicePeriodBreakdown[periodKey] || 0) + 1;
+
+      if (v.visitDate && v.visitDate.length >= 7) {
+        const monthKey = v.visitDate.slice(0, 7);
+        monthlyCounts[monthKey] = (monthlyCounts[monthKey] || 0) + 1;
+      }
+
+      if (v.status !== "novo" && v.createdAt) {
+        const createdMs = new Date(v.createdAt).getTime();
+        const contactNotes = (v.notes || [])
+          .filter((n) => n.actionTag === "MUDANCA_STATUS" || n.actionTag === "MENSAGEM_WHATSAPP")
+          .map((n) => new Date(n.createdAt).getTime())
+          .filter((ms) => !Number.isNaN(ms) && ms >= createdMs);
+
+        const firstContactMs =
+          contactNotes.length > 0
+            ? Math.min(...contactNotes)
+            : v.updatedAt
+            ? new Date(v.updatedAt).getTime()
+            : NaN;
+
+        if (!Number.isNaN(createdMs) && !Number.isNaN(firstContactMs) && firstContactMs >= createdMs) {
+          totalContactMinutes += (firstContactMs - createdMs) / 60000;
+          firstContactCount += 1;
+        }
+      }
     });
+
+    const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const monthlyBreakdown = Object.entries(monthlyCounts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([monthKey, count]) => {
+        const [year, month] = monthKey.split("-");
+        const monthIdx = Math.max(0, Math.min(11, parseInt(month, 10) - 1));
+        return {
+          monthKey,
+          label: `${MONTH_NAMES[monthIdx]}/${year.slice(2)}`,
+          count,
+        };
+      });
+
+    const avgFirstContactMinutes =
+      firstContactCount > 0 ? Math.round(totalContactMinutes / firstContactCount) : null;
+
+    let avgFirstContactFormatted = "—";
+    if (avgFirstContactMinutes !== null) {
+      if (avgFirstContactMinutes < 1) {
+        avgFirstContactFormatted = "< 1 min";
+      } else if (avgFirstContactMinutes < 60) {
+        avgFirstContactFormatted = `${avgFirstContactMinutes} min`;
+      } else if (avgFirstContactMinutes < 1440) {
+        const hours = Math.floor(avgFirstContactMinutes / 60);
+        const mins = avgFirstContactMinutes % 60;
+        avgFirstContactFormatted = mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+      } else {
+        const days = Math.floor(avgFirstContactMinutes / 1440);
+        const hours = Math.floor((avgFirstContactMinutes % 1440) / 60);
+        avgFirstContactFormatted = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+      }
+    }
 
     const pendingRequests = requests.filter((r) => r.status === "pendente");
 
@@ -141,6 +211,12 @@ export async function GET(request: Request) {
         integrados: integradosCount,
         channelBreakdown,
         statusBreakdown,
+        churchBackgroundBreakdown,
+        servicePeriodBreakdown,
+        monthlyBreakdown,
+        avgFirstContactMinutes,
+        avgFirstContactFormatted,
+        firstContactCount,
       },
       pendingRequestsCount: pendingRequests.length,
       // Apenas Administradores têm acesso à lista de solicitações e à equipe
@@ -329,6 +405,75 @@ export async function POST(request: Request) {
         authorName: authorMemberName || "Equipe Bem-Vindos",
         text: logText,
         actionTag: "MUDANCA_STATUS",
+      });
+
+      data.visitors[visitorIndex] = visitor;
+      writeBemVindosLocal({ visitors: data.visitors });
+
+      if (supabase) {
+        await saveVisitorSupabase(supabase, visitor);
+      }
+
+      return NextResponse.json({ ok: true, visitor });
+    }
+
+    // 3.1 EDITAR DADOS CADASTRAIS DO VISITANTE
+    if (action === "UPDATE_VISITOR") {
+      const {
+        visitorId,
+        fullName,
+        phone,
+        howHeard,
+        howHeardDetail,
+        churchBackground,
+        otherChurchName,
+        visitDate,
+        servicePeriod,
+        neighborhood,
+        city,
+        prayerRequest,
+        authorMemberId,
+        authorMemberName,
+      } = payload;
+
+      const visitorIndex = data.visitors.findIndex((v) => v.id === visitorId);
+      if (visitorIndex < 0) {
+        return NextResponse.json({ error: "Visitante não encontrado." }, { status: 404 });
+      }
+
+      if (!fullName || !fullName.trim()) {
+        return NextResponse.json({ error: "Nome completo é obrigatório." }, { status: 400 });
+      }
+
+      const cleanedPhone = cleanDigits(phone);
+      if (!cleanedPhone || cleanedPhone.length < 10) {
+        return NextResponse.json({ error: "Telefone com WhatsApp válido é obrigatório." }, { status: 400 });
+      }
+
+      const visitor = data.visitors[visitorIndex];
+      visitor.fullName = fullName.trim();
+      visitor.phone = phone.trim();
+      visitor.howHeard = howHeard || visitor.howHeard;
+      visitor.howHeardDetail = howHeardDetail?.trim() || undefined;
+      visitor.churchBackground = churchBackground?.trim() || undefined;
+      visitor.otherChurchName =
+        churchBackground === "Sim, sou de outra igreja"
+          ? otherChurchName?.trim() || undefined
+          : undefined;
+      visitor.visitDate = visitDate || visitor.visitDate;
+      visitor.servicePeriod = servicePeriod || visitor.servicePeriod;
+      visitor.neighborhood = neighborhood?.trim() || undefined;
+      visitor.city = city?.trim() || undefined;
+      visitor.prayerRequest = prayerRequest?.trim() || undefined;
+      visitor.updatedAt = new Date().toISOString();
+
+      if (!visitor.notes) visitor.notes = [];
+      visitor.notes.unshift({
+        id: `note-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        authorId: authorMemberId,
+        authorName: authorMemberName || "Equipe Bem-Vindo",
+        text: "Dados cadastrais do visitante editados no painel.",
       });
 
       data.visitors[visitorIndex] = visitor;

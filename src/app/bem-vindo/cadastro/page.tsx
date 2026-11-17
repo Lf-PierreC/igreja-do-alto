@@ -7,6 +7,7 @@ import {
   HOW_HEARD_OPTIONS,
   HowHeardChannel,
   CHURCH_BACKGROUND_OPTIONS,
+  SERVICE_PERIOD_OPTIONS,
 } from "@/types/bemVindos";
 import {
   Heart,
@@ -36,7 +37,7 @@ export default function CadastroVisitantePage() {
   const [visitDate, setVisitDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
-  const [servicePeriod, setServicePeriod] = useState("Domingo Noite (18h)");
+  const [servicePeriod, setServicePeriod] = useState<string>(SERVICE_PERIOD_OPTIONS[0]);
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("Mogi das Cruzes");
   const [prayerRequest, setPrayerRequest] = useState("");
@@ -372,9 +373,11 @@ export default function CadastroVisitantePage() {
                   onChange={(e) => setServicePeriod(e.target.value)}
                   className="w-full px-3.5 py-3 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm font-medium focus:bg-white focus:border-[#CB4B3B] outline-none"
                 >
-                  <option value="Domingo (10h)">Domingo (10h)</option>
-                  <option value="Quinta-feira (20h)">Quinta-feira (20h)</option>
-                  <option value="Outro">Outro</option>
+                  {SERVICE_PERIOD_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
                 </select>
               </div>
 

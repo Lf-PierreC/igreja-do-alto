@@ -10,6 +10,7 @@ import {
   HOW_HEARD_OPTIONS,
   HowHeardChannel,
   CHURCH_BACKGROUND_OPTIONS,
+  SERVICE_PERIOD_OPTIONS,
   BemVindosAccessRequest,
   BemVindosTeamMember,
   VisitorNote,
@@ -41,6 +42,9 @@ import {
   ExternalLink,
   Lock,
   Church,
+  Pencil,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 
 interface BemVindosSession {
@@ -112,6 +116,21 @@ export default function BemVindoPortalPage() {
     "boas_vindas"
   );
 
+  // Modal de Edição de Visitante
+  const [editingVisitor, setEditingVisitor] = useState<FirstTimeVisitor | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editChurchBg, setEditChurchBg] = useState<string>("Não frequento nenhuma igreja");
+  const [editOtherChurch, setEditOtherChurch] = useState("");
+  const [editHowHeard, setEditHowHeard] = useState<HowHeardChannel>("Instagram");
+  const [editHowHeardDetail, setEditHowHeardDetail] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editServicePeriod, setEditServicePeriod] = useState<string>(SERVICE_PERIOD_OPTIONS[0]);
+  const [editNeighborhood, setEditNeighborhood] = useState("");
+  const [editCity, setEditCity] = useState("Mogi das Cruzes");
+  const [editPrayerRequest, setEditPrayerRequest] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   // Formulário Interno de Cadastro de Visitante
   const [newVisFullName, setNewVisFullName] = useState("");
   const [newVisPhone, setNewVisPhone] = useState("");
@@ -120,7 +139,7 @@ export default function BemVindoPortalPage() {
   const [newVisHowHeard, setNewVisHowHeard] = useState<HowHeardChannel>("Instagram");
   const [newVisHowHeardDetail, setNewVisHowHeardDetail] = useState("");
   const [newVisDate, setNewVisDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [newVisServicePeriod, setNewVisServicePeriod] = useState("Domingo Noite (18h)");
+  const [newVisServicePeriod, setNewVisServicePeriod] = useState<string>(SERVICE_PERIOD_OPTIONS[0]);
   const [newVisNeighborhood, setNewVisNeighborhood] = useState("");
   const [newVisCity, setNewVisCity] = useState("Mogi das Cruzes");
   const [newVisPrayerRequest, setNewVisPrayerRequest] = useState("");
@@ -473,16 +492,81 @@ export default function BemVindoPortalPage() {
     }
   };
 
-  // Formatação de telefone no formulário de cadastro interno
-  const handleNewVisPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\D/g, "");
+  // Formatação de telefone compartilhada
+  const formatPhoneMask = (value: string) => {
+    let raw = value.replace(/\D/g, "");
     if (raw.length > 11) raw = raw.slice(0, 11);
-    if (raw.length <= 2) setNewVisPhone(raw ? `(${raw}` : "");
-    else if (raw.length <= 6) setNewVisPhone(`(${raw.slice(0, 2)}) ${raw.slice(2)}`);
-    else if (raw.length <= 10)
-      setNewVisPhone(`(${raw.slice(0, 2)}) ${raw.slice(2, 6)}-${raw.slice(6)}`);
-    else
-      setNewVisPhone(`(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7, 11)}`);
+    if (raw.length <= 2) return raw ? `(${raw}` : "";
+    if (raw.length <= 6) return `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+    if (raw.length <= 10) return `(${raw.slice(0, 2)}) ${raw.slice(2, 6)}-${raw.slice(6)}`;
+    return `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7, 11)}`;
+  };
+
+  const handleNewVisPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewVisPhone(formatPhoneMask(e.target.value));
+  };
+
+  // Abrir modal de edição de visitante
+  const openEditVisitorModal = (v: FirstTimeVisitor) => {
+    setEditingVisitor(v);
+    setEditFullName(v.fullName || "");
+    setEditPhone(v.phone || "");
+    setEditChurchBg(v.churchBackground || "Não frequento nenhuma igreja");
+    setEditOtherChurch(v.otherChurchName || "");
+    setEditHowHeard(v.howHeard || "Instagram");
+    setEditHowHeardDetail(v.howHeardDetail || "");
+    setEditDate(v.visitDate || new Date().toISOString().split("T")[0]);
+    setEditServicePeriod(v.servicePeriod || SERVICE_PERIOD_OPTIONS[0]);
+    setEditNeighborhood(v.neighborhood || "");
+    setEditCity(v.city || "Mogi das Cruzes");
+    setEditPrayerRequest(v.prayerRequest || "");
+  };
+
+  // Salvar edição do visitante
+  const handleSaveVisitorEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVisitor || !editFullName.trim() || !editPhone.trim()) return;
+
+    setEditSubmitting(true);
+    try {
+      const res = await fetch("/api/bem-vindo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_VISITOR",
+          payload: {
+            visitorId: editingVisitor.id,
+            fullName: editFullName.trim(),
+            phone: editPhone.trim(),
+            churchBackground: editChurchBg,
+            otherChurchName: editOtherChurch.trim() || undefined,
+            howHeard: editHowHeard,
+            howHeardDetail: editHowHeardDetail.trim() || undefined,
+            visitDate: editDate,
+            servicePeriod: editServicePeriod,
+            neighborhood: editNeighborhood.trim() || undefined,
+            city: editCity.trim() || undefined,
+            prayerRequest: editPrayerRequest.trim() || undefined,
+            authorMemberId: session?.id,
+            authorMemberName: session?.name,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Erro ao salvar alterações do visitante.");
+      }
+
+      setVisitors((prev) =>
+        prev.map((item) => (item.id === editingVisitor.id ? data.visitor : item))
+      );
+      setEditingVisitor(null);
+      loadPlatformData();
+    } catch (err: any) {
+      alert(err.message || "Erro ao salvar alterações.");
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   // Copiar link público
@@ -715,20 +799,22 @@ export default function BemVindoPortalPage() {
   // DASHBOARD PRINCIPAL DA PLATAFORMA BEM-VINDO
   // ============================================================================
   return (
-    <main className="min-h-screen bg-[#DCDACF] text-[#252525] flex flex-col">
+    <main className="min-h-screen bg-[#DCDACF] text-[#252525] flex flex-col overflow-x-hidden">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-30 px-4 sm:px-8 py-3.5 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrandLogo variant="on-sand" size="sm" showTagline={false} />
+      <header className="bg-white border-b border-stone-200 sticky top-0 z-30 px-3 sm:px-8 py-3 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="shrink-0">
+              <BrandLogo variant="on-sand" size="sm" showTagline={false} />
+            </div>
             <div className="h-6 w-px bg-stone-300 hidden sm:block" />
-            <div className="inline-flex items-center gap-1.5 bg-[#CB4B3B]/10 text-[#CB4B3B] px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">
-              <Heart className="w-3.5 h-3.5 fill-[#CB4B3B]" />
-              Painel Bem-Vindo
+            <div className="inline-flex items-center gap-1 bg-[#CB4B3B]/10 text-[#CB4B3B] px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap shrink-0">
+              <Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-[#CB4B3B]" />
+              <span>Bem-Vindo</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-3 text-xs shrink-0">
             <div className="text-right hidden sm:block">
               <p className="font-extrabold text-stone-900 leading-tight">{session.name}</p>
               <p className="text-stone-500 text-[11px]">
@@ -744,7 +830,7 @@ export default function BemVindoPortalPage() {
 
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-700 text-stone-700 font-bold transition"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-700 text-stone-700 font-bold transition"
               title="Sair do painel"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -755,42 +841,42 @@ export default function BemVindoPortalPage() {
       </header>
 
       {/* Sub Header com Navegação em Abas */}
-      <nav className="bg-[#EAE8DD] border-b border-stone-300 px-4 sm:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1 sm:gap-2">
+      <nav className="bg-[#EAE8DD] border-b border-stone-300 px-3 sm:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab("visitantes")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === "visitantes"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-600 hover:bg-white/60"
               }`}
             >
-              <Users className="w-4 h-4 text-[#CB4B3B]" />
+              <Users className="w-4 h-4 text-[#CB4B3B] shrink-0" />
               <span>Visitantes ({visitors.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab("cadastrar")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === "cadastrar"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-600 hover:bg-white/60"
               }`}
             >
-              <UserPlus className="w-4 h-4 text-emerald-600" />
+              <UserPlus className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Cadastrar no Balcão</span>
             </button>
 
             <button
               onClick={() => setActiveTab("metricas")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === "metricas"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-600 hover:bg-white/60"
               }`}
             >
-              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>Métricas & Canais</span>
             </button>
 
@@ -798,13 +884,13 @@ export default function BemVindoPortalPage() {
             {isAdmin && (
               <button
                 onClick={() => setActiveTab("acessos")}
-                className={`relative px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+                className={`relative px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 ${
                   activeTab === "acessos"
                     ? "bg-stone-900 text-white shadow-sm"
                     : "text-stone-700 hover:bg-white/60"
                 }`}
               >
-                <Shield className="w-4 h-4 text-amber-400" />
+                <Shield className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>Gestão de Acessos</span>
                 {pendingRequestsCount > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse">
@@ -818,7 +904,7 @@ export default function BemVindoPortalPage() {
           {/* Botão de Atalho para Copiar Link de Visitantes */}
           <button
             onClick={copyPublicLink}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-stone-300 text-stone-800 text-xs font-bold hover:bg-stone-50 transition shadow-sm"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-stone-300 text-stone-800 text-xs font-bold hover:bg-stone-50 transition shadow-sm shrink-0 w-full sm:w-auto"
           >
             {copiedLink ? (
               <>
@@ -1070,11 +1156,17 @@ export default function BemVindoPortalPage() {
                       className="bg-white rounded-2xl p-4 sm:p-5 border border-stone-200 shadow-sm hover:shadow-md transition flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
                     >
                       {/* Dados Básicos */}
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <h3 className="font-black text-base text-stone-900 tracking-tight">
-                            {v.fullName}
-                          </h3>
+                      <div className="space-y-1.5 flex-1 min-w-0 w-full">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditVisitorModal(v)}
+                            className="font-black text-base text-stone-900 hover:text-[#CB4B3B] tracking-tight text-left transition inline-flex items-center gap-1.5 group"
+                            title="Clique para editar os dados deste visitante"
+                          >
+                            <span className="break-words">{v.fullName}</span>
+                            <Pencil className="w-3.5 h-3.5 text-stone-400 group-hover:text-[#CB4B3B] shrink-0" />
+                          </button>
 
                           {/* Seletor Rápido de Status */}
                           <div className="relative inline-block">
@@ -1151,15 +1243,25 @@ export default function BemVindoPortalPage() {
                       </div>
 
                       {/* Botões de Ação Rápida */}
-                      <div className="flex items-center gap-2 w-full lg:w-auto justify-end border-t lg:border-t-0 pt-3 lg:pt-0 border-stone-100">
+                      <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end border-t lg:border-t-0 pt-3 lg:pt-0 border-stone-100 shrink-0">
                         {/* Botão Verde WhatsApp */}
                         <button
                           onClick={() => setWhatsappModalVisitor(v)}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm hover:shadow transition inline-flex items-center gap-1.5"
+                          className="flex-1 sm:flex-none justify-center px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm hover:shadow transition inline-flex items-center gap-1.5"
                           title="Enviar mensagem personalizada pelo WhatsApp"
                         >
-                          <MessageCircle className="w-4 h-4" />
+                          <MessageCircle className="w-4 h-4 shrink-0" />
                           <span>WhatsApp</span>
+                        </button>
+
+                        {/* Botão Editar Cadastro */}
+                        <button
+                          onClick={() => openEditVisitorModal(v)}
+                          className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-amber-50 hover:text-amber-800 text-stone-800 font-bold text-xs transition inline-flex items-center gap-1.5"
+                          title="Editar dados do visitante"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-stone-600" />
+                          <span>Editar</span>
                         </button>
 
                         {/* Botão Histórico / Anotações */}
@@ -1314,10 +1416,11 @@ export default function BemVindoPortalPage() {
                       onChange={(e) => setNewVisServicePeriod(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
                     >
-                      <option value="Domingo Noite (18h)">Domingo Noite (18h)</option>
-                      <option value="Domingo Manhã (10h)">Domingo Manhã (10h)</option>
-                      <option value="Quinta-feira (20h)">Quinta-feira (20h)</option>
-                      <option value="Culto Especial">Culto Especial</option>
+                      {SERVICE_PERIOD_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1472,21 +1575,21 @@ export default function BemVindoPortalPage() {
            ========================================================================= */}
         {activeTab === "metricas" && metrics && (
           <div className="space-y-6 animate-fade-in">
-            {/* Cards de Resumo */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+            {/* Cards de Resumo (KPIs) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
                   Taxa de Contato
                 </span>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-4xl font-black text-emerald-600">
+                  <span className="text-3xl sm:text-4xl font-black text-emerald-600">
                     {metrics.percentContactados}%
                   </span>
                   <span className="text-xs text-stone-600">
-                    ({metrics.contactados} de {metrics.total} contatados)
+                    ({metrics.contactados} de {metrics.total})
                   </span>
                 </div>
-                <div className="w-full bg-stone-100 h-2.5 rounded-full mt-3 overflow-hidden">
+                <div className="w-full bg-stone-100 h-2 rounded-full mt-3 overflow-hidden">
                   <div
                     className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                     style={{ width: `${metrics.percentContactados}%` }}
@@ -1494,61 +1597,260 @@ export default function BemVindoPortalPage() {
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
-                  Em Relacionamento Ativo
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#CB4B3B]" />
+                  <span>Tempo Médio p/ 1º Contato</span>
                 </span>
-                <span className="text-4xl font-black text-purple-600 mt-2 block">
-                  {metrics.emConversa}
+                <span className="text-3xl sm:text-4xl font-black text-[#CB4B3B] mt-2 block">
+                  {metrics.avgFirstContactFormatted || "—"}
                 </span>
-                <p className="text-xs text-stone-500 mt-1">
-                  Visitantes interagindo ou convidados para Casa do Alto
+                <p className="text-[11px] text-stone-500 mt-1">
+                  {metrics.firstContactCount > 0
+                    ? `Baseado em ${metrics.firstContactCount} contato(s) registrado(s)`
+                    : "Aguardando primeiros contatos"}
                 </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                  Em Relacionamento Ativo
+                </span>
+                <span className="text-3xl sm:text-4xl font-black text-purple-600 mt-2 block">
+                  {metrics.emConversa}
+                </span>
+                <p className="text-[11px] text-stone-500 mt-1">
+                  Visitantes em conversa ou convidados para célula
+                </p>
+              </div>
+
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
                   Integrados à Igreja
                 </span>
-                <span className="text-4xl font-black text-stone-900 mt-2 block">
-                  {metrics.integrados}
-                </span>
-                <p className="text-xs text-stone-500 mt-1">
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-3xl sm:text-4xl font-black text-stone-900">
+                    {metrics.integrados}
+                  </span>
+                  <span className="text-xs font-bold text-emerald-700">
+                    ({metrics.total > 0 ? Math.round((metrics.integrados / metrics.total) * 100) : 0}%)
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 mt-1">
                   Pessoas que se tornaram frequentadoras ativas
                 </p>
               </div>
             </div>
 
-            {/* Distribuição por Canais ("Onde nos conheceu") */}
-            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
-              <h3 className="text-lg font-black text-stone-900">
-                Onde as pessoas estão conhecendo a Igreja do Alto?
-              </h3>
-              <p className="text-xs text-stone-500">
-                Distribuição dos canais de atração informados pelos próprios visitantes
-              </p>
+            {/* Gráfico de Visitantes por Mês + Funil por Status */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Visitantes por Mês */}
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-[#CB4B3B]" />
+                    <span>Visitantes por Mês</span>
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Evolução mensal de novos visitantes cadastrados
+                  </p>
+                </div>
 
-              <div className="space-y-3 pt-2">
-                {Object.entries(metrics.channelBreakdown || {}).map(([channel, count]: any) => {
-                  const percentage =
-                    metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
-                  return (
-                    <div key={channel} className="space-y-1">
-                      <div className="flex justify-between text-xs font-bold text-stone-700">
-                        <span>{channel}</span>
-                        <span>
-                          {count} ({percentage}%)
+                {(!metrics.monthlyBreakdown || metrics.monthlyBreakdown.length === 0) ? (
+                  <div className="py-12 text-center bg-stone-50 rounded-2xl border border-stone-100 text-xs text-stone-400">
+                    Ainda não há registros de visitas para exibir o gráfico mensal.
+                  </div>
+                ) : (
+                  (() => {
+                    const maxMonthCount = Math.max(
+                      ...metrics.monthlyBreakdown.map((m: any) => m.count),
+                      1
+                    );
+                    return (
+                      <div className="pt-4 pb-2 overflow-x-auto">
+                        <div className="flex items-end gap-3 sm:gap-4 h-48 min-w-[260px] px-2 border-b border-stone-200">
+                          {metrics.monthlyBreakdown.map((item: any) => {
+                            const heightPct = Math.max(
+                              Math.round((item.count / maxMonthCount) * 100),
+                              8
+                            );
+                            return (
+                              <div
+                                key={item.monthKey}
+                                className="flex-1 min-w-[44px] flex flex-col items-center justify-end h-full group"
+                              >
+                                <span className="text-xs font-black text-stone-800 mb-1.5">
+                                  {item.count}
+                                </span>
+                                <div
+                                  className="w-full max-w-[42px] bg-[#CB4B3B] group-hover:bg-[#a93829] rounded-t-xl transition-all duration-500 shadow-sm"
+                                  style={{ height: `${heightPct}%` }}
+                                  title={`${item.label}: ${item.count} visitante(s)`}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-[260px] px-2 pt-2">
+                          {metrics.monthlyBreakdown.map((item: any) => (
+                            <div
+                              key={item.monthKey}
+                              className="flex-1 min-w-[44px] text-center text-[11px] font-bold text-stone-600"
+                            >
+                              {item.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Visitantes por Status */}
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-stone-900">
+                    Visitantes por Status
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Distribuição atual no funil de acolhimento e integração
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {VISITOR_STATUSES.map((st) => {
+                    const count = metrics.statusBreakdown?.[st.id] || 0;
+                    const percentage =
+                      metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
+                    return (
+                      <div key={st.id} className="space-y-1">
+                        <div className="flex justify-between items-center text-xs font-bold text-stone-700 gap-2">
+                          <span className="flex items-center gap-2 min-w-0 truncate">
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${st.dotColor}`} />
+                            <span className="truncate">{st.label}</span>
+                          </span>
+                          <span className="shrink-0 text-stone-900">
+                            {count}{" "}
+                            <span className="text-stone-400 font-semibold">({percentage}%)</span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${st.dotColor}`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Canais ("Onde nos conheceu") + Vínculo com Igreja e Cultos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Canais */}
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-stone-900">
+                    Onde nos conheceram?
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Canais de atração informados pelos visitantes
+                  </p>
+                </div>
+
+                {Object.keys(metrics.channelBreakdown || {}).length === 0 ? (
+                  <p className="text-xs text-stone-400 py-6 text-center">Sem dados disponíveis.</p>
+                ) : (
+                  <div className="space-y-3 pt-1">
+                    {Object.entries(metrics.channelBreakdown || {})
+                      .sort(([, a]: any, [, b]: any) => b - a)
+                      .map(([channel, count]: any) => {
+                        const percentage =
+                          metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
+                        return (
+                          <div key={channel} className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold text-stone-700 gap-2">
+                              <span className="truncate">{channel}</span>
+                              <span className="shrink-0">
+                                {count} ({percentage}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                              <div
+                                className="bg-[#CB4B3B] h-full rounded-full transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Vínculo com Igreja & Cultos */}
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-stone-900">
+                      Vínculo com Igreja
+                    </h3>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Perfil espiritual informado no cadastro
+                    </p>
+                  </div>
+
+                  {Object.keys(metrics.churchBackgroundBreakdown || {}).length === 0 ? (
+                    <p className="text-xs text-stone-400 py-4 text-center">Sem dados disponíveis.</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {Object.entries(metrics.churchBackgroundBreakdown || {})
+                        .sort(([, a]: any, [, b]: any) => b - a)
+                        .map(([bg, count]: any) => {
+                          const percentage =
+                            metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
+                          return (
+                            <div key={bg} className="space-y-1">
+                              <div className="flex justify-between text-xs font-bold text-stone-700 gap-2">
+                                <span className="truncate">{bg}</span>
+                                <span className="shrink-0">
+                                  {count} ({percentage}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-stone-100 space-y-3">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">
+                    Visitantes por Culto
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(metrics.servicePeriodBreakdown || {}).map(([period, count]: any) => (
+                      <div
+                        key={period}
+                        className="px-3 py-2 rounded-xl bg-stone-50 border border-stone-200 text-xs font-bold text-stone-800 flex items-center gap-2"
+                      >
+                        <span>{period}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-white border border-stone-200 text-[#CB4B3B] font-black">
+                          {count}
                         </span>
                       </div>
-                      <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-[#CB4B3B] h-full rounded-full transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1558,26 +1860,26 @@ export default function BemVindoPortalPage() {
             ABA 4: GESTÃO DE ACESSOS (EXCLUSIVO ADMINISTRADORES)
            ========================================================================= */}
         {activeTab === "acessos" && isAdmin && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5 sm:space-y-6 animate-fade-in">
             {/* Solicitações Pendentes */}
-            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-amber-500" />
+            <div className="bg-white rounded-3xl p-4 sm:p-6 border border-stone-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-amber-500 shrink-0" />
                     <span>Solicitações de Acesso Pendentes</span>
                   </h2>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-stone-500 mt-0.5">
                     Pastores, líderes e voluntários aguardando liberação do administrador
                   </p>
                 </div>
-                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-extrabold">
+                <span className="self-start sm:self-auto px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-extrabold whitespace-nowrap shrink-0">
                   {accessRequests.filter((r) => r.status === "pendente").length} pendente(s)
                 </span>
               </div>
 
               {accessRequests.filter((r) => r.status === "pendente").length === 0 ? (
-                <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
+                <div className="p-6 sm:p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
                   Nenhuma solicitação de acesso pendente no momento.
                 </div>
               ) : (
@@ -1589,11 +1891,15 @@ export default function BemVindoPortalPage() {
                         key={req.id}
                         className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                       >
-                        <div className="space-y-1">
-                          <p className="font-extrabold text-sm text-stone-900">{req.memberName}</p>
-                          <div className="text-xs text-stone-600 flex flex-wrap gap-2">
-                            <span>📞 {req.memberPhone}</span>
-                            <span>✉️ {req.memberEmail}</span>
+                        <div className="space-y-1.5 min-w-0 w-full">
+                          <p className="font-extrabold text-sm text-stone-900 break-words">
+                            {req.memberName}
+                          </p>
+                          <div className="text-xs text-stone-600 flex flex-wrap gap-x-3 gap-y-1">
+                            {req.memberPhone && <span>📞 {req.memberPhone}</span>}
+                            {req.memberEmail && (
+                              <span className="break-all">✉️ {req.memberEmail}</span>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {req.memberMinistries.map((min, idx) => (
@@ -1607,10 +1913,10 @@ export default function BemVindoPortalPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200/60">
                           <button
                             onClick={() => handleReviewRequest(req.id, "aprovado", req.role || "voluntario")}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1"
+                            className="flex-1 sm:flex-none justify-center px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1.5"
                           >
                             <UserCheck className="w-3.5 h-3.5" />
                             <span>Aprovar</span>
@@ -1618,7 +1924,7 @@ export default function BemVindoPortalPage() {
 
                           <button
                             onClick={() => handleReviewRequest(req.id, "recusado")}
-                            className="px-3 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold text-xs transition inline-flex items-center gap-1"
+                            className="flex-1 sm:flex-none justify-center px-3.5 py-2 sm:py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold text-xs transition inline-flex items-center gap-1.5"
                           >
                             <UserX className="w-3.5 h-3.5" />
                             <span>Recusar</span>
@@ -1631,52 +1937,99 @@ export default function BemVindoPortalPage() {
             </div>
 
             {/* Membros Ativos da Equipe */}
-            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-stone-700" />
-                <span>Equipe Ativa com Acesso Liberado</span>
-              </h2>
+            <div className="bg-white rounded-3xl p-4 sm:p-6 border border-stone-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-stone-700 shrink-0" />
+                  <span>Equipe Ativa com Acesso Liberado</span>
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 text-xs font-extrabold whitespace-nowrap shrink-0">
+                  {team.length}
+                </span>
+              </div>
 
               {team.length === 0 ? (
-                <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
+                <div className="p-6 sm:p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
                   Nenhum voluntário cadastrado na equipe ainda. Aprovados aparecerão aqui.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-stone-200 text-stone-500 font-bold uppercase tracking-wider">
-                        <th className="py-2.5">Nome</th>
-                        <th className="py-2.5">Telefone</th>
-                        <th className="py-2.5">Função</th>
-                        <th className="py-2.5">Aprovado Por</th>
-                        <th className="py-2.5 text-right">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {team.map((member) => (
-                        <tr key={member.memberId} className="hover:bg-stone-50">
-                          <td className="py-3 font-bold text-stone-900">{member.memberName}</td>
-                          <td className="py-3 text-stone-600">{member.phone}</td>
-                          <td className="py-3">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">
-                              {member.role}
-                            </span>
-                          </td>
-                          <td className="py-3 text-stone-500">{member.approvedBy}</td>
-                          <td className="py-3 text-right">
-                            <button
-                              onClick={() => handleRevokeAccess(member.memberId)}
-                              className="text-red-600 hover:text-red-800 font-bold text-xs"
-                            >
-                              Revogar Acesso
-                            </button>
-                          </td>
+                <>
+                  {/* Visualização Mobile em Cards */}
+                  <div className="md:hidden space-y-3">
+                    {team.map((member) => (
+                      <div
+                        key={member.memberId}
+                        className="p-4 rounded-2xl bg-[#F7F6F2] border border-stone-200 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-sm text-stone-900 break-words">
+                              {member.memberName}
+                            </p>
+                            {member.phone && (
+                              <p className="text-xs text-stone-600 mt-0.5 flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-[#CB4B3B] shrink-0" />
+                                <span>{member.phone}</span>
+                              </p>
+                            )}
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase whitespace-nowrap shrink-0">
+                            {member.role}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200/80">
+                          <span className="text-[11px] text-stone-500">
+                            Aprovado por: <strong className="text-stone-700">{member.approvedBy}</strong>
+                          </span>
+                          <button
+                            onClick={() => handleRevokeAccess(member.memberId)}
+                            className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs transition shrink-0"
+                          >
+                            Revogar Acesso
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Visualização Desktop em Tabela */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-stone-200 text-stone-500 font-bold uppercase tracking-wider">
+                          <th className="py-2.5">Nome</th>
+                          <th className="py-2.5">Telefone</th>
+                          <th className="py-2.5">Função</th>
+                          <th className="py-2.5">Aprovado Por</th>
+                          <th className="py-2.5 text-right">Ação</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {team.map((member) => (
+                          <tr key={member.memberId} className="hover:bg-stone-50">
+                            <td className="py-3 font-bold text-stone-900">{member.memberName}</td>
+                            <td className="py-3 text-stone-600">{member.phone || "—"}</td>
+                            <td className="py-3">
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">
+                                {member.role}
+                              </span>
+                            </td>
+                            <td className="py-3 text-stone-500">{member.approvedBy}</td>
+                            <td className="py-3 text-right">
+                              <button
+                                onClick={() => handleRevokeAccess(member.memberId)}
+                                className="text-red-600 hover:text-red-800 font-bold text-xs"
+                              >
+                                Revogar Acesso
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1838,6 +2191,220 @@ export default function BemVindoPortalPage() {
                 <span>Abrir WhatsApp Web / App</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL: EDITAR FORMULÁRIO DO VISITANTE
+         ========================================================================= */}
+      {editingVisitor && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-stone-200 flex flex-col max-h-[90vh] overflow-hidden animate-scale-up">
+            {/* Cabeçalho */}
+            <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50 shrink-0">
+              <div>
+                <h3 className="font-black text-base text-stone-900 flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-[#CB4B3B]" />
+                  <span>Editar Cadastro de Visitante</span>
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Atualize os dados informados no formulário
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingVisitor(null)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Formulário */}
+            <form onSubmit={handleSaveVisitorEdit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    WhatsApp / Celular *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(formatPhoneMask(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Vínculo com Igreja
+                  </label>
+                  <select
+                    value={editChurchBg}
+                    onChange={(e) => setEditChurchBg(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  >
+                    {CHURCH_BACKGROUND_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {editChurchBg === "Sim, sou de outra igreja" && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                      Qual igreja?
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome da igreja"
+                      value={editOtherChurch}
+                      onChange={(e) => setEditOtherChurch(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Onde nos conheceu?
+                  </label>
+                  <select
+                    value={editHowHeard}
+                    onChange={(e) => setEditHowHeard(e.target.value as HowHeardChannel)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  >
+                    {HOW_HEARD_OPTIONS.map((ch) => (
+                      <option key={ch.id} value={ch.id}>
+                        {ch.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Detalhe / Quem indicou
+                  </label>
+                  <input
+                    type="text"
+                    value={editHowHeardDetail}
+                    onChange={(e) => setEditHowHeardDetail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Culto / Horário
+                  </label>
+                  <select
+                    value={editServicePeriod}
+                    onChange={(e) => setEditServicePeriod(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  >
+                    {SERVICE_PERIOD_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                    {!SERVICE_PERIOD_OPTIONS.includes(editServicePeriod as any) && editServicePeriod && (
+                      <option value={editServicePeriod}>{editServicePeriod}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Data da Visita
+                  </label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Bairro
+                  </label>
+                  <input
+                    type="text"
+                    value={editNeighborhood}
+                    onChange={(e) => setEditNeighborhood(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Pedido de Oração
+                </label>
+                <textarea
+                  rows={2}
+                  value={editPrayerRequest}
+                  onChange={(e) => setEditPrayerRequest(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#F7F6F2] border border-stone-300 rounded-xl text-stone-900 text-sm outline-none focus:bg-white focus:border-[#CB4B3B] resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingVisitor(null)}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="flex-1 py-3 rounded-xl bg-[#CB4B3B] hover:bg-[#a93829] text-white font-extrabold text-xs shadow transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {editSubmitting ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
