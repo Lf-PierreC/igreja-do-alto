@@ -361,22 +361,24 @@ export default function BemVindoPortalPage() {
   const handleOpenWhatsApp = (visitor: FirstTimeVisitor) => {
     const rawPhone = visitor.phone.replace(/\D/g, "");
     const formattedPhone = rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`;
-    const firstName = visitor.fullName.split(" ")[0];
+    const trimmedName = visitor.fullName.trim();
+    const greetingName = /\s+(e|&)\s+/i.test(trimmedName)
+      ? trimmedName
+      : trimmedName.split(" ")[0];
     const volunteerFirstName = session?.name ? session.name.split(" ")[0] : "da equipe";
 
     let msg = "";
     if (whatsappTemplate === "boas_vindas") {
-      msg = `Olá ${firstName}, graça e paz! Aqui é ${volunteerFirstName}, da equipe de Bem-Vindo da Igreja do Alto! 🕊️\n\nFoi uma imensa alegria ter você conosco em nosso culto! Esperamos que seu coração tenha sido grandemente abençoado.\n\nComo foi a sua experiência? Caso precise de oração ou queira tirar qualquer dúvida sobre a nossa igreja, estamos aqui de coração aberto! Deus te abençoe grandemente!`;
+      msg = `Olá ${greetingName}\nComo vocês estão?😄\n\nA Família Igreja do Alto agradece sua visita. Foi uma alegria receber você! 😍\n\nQuero que você saiba que aqui vocês são muito bem-vindos, de verdade.💝\nNossa igreja é uma família, e vai ser uma alegria caminharmos juntos, crescer na fé e viver tudo o que Deus tem preparado.🙏🏻 🙌\n\nSe quiser nos acompanhar mais de perto, aqui estão nossas redes:\n\n🔗 https://linktr.ee/igrejaaltoretiro\n\nNossos cultos acontecem:\n* Quinta-feira às 20h\n* Domingo às 10h\n\nConte com a igreja, tá bom?\nCom carinho,\n\nTime Bem-vindos\nIgreja do Alto`;
     } else if (whatsappTemplate === "culto_proximo") {
-      msg = `Olá ${firstName}, tudo bem? Aqui é ${volunteerFirstName}, da Igreja do Alto! Passando para te desejar uma semana de paz e já te convidar para estar conosco no próximo domingo! Nossos cultos acontecem às 10h e às 18h. Teremos um lugar especial reservado para você! Esperamos você! 🙌`;
+      msg = `Olá ${greetingName}, tudo bem? Aqui é ${volunteerFirstName}, da Igreja do Alto! Passando para te desejar uma semana de paz e já te convidar para estar conosco no próximo culto! Nossos cultos acontecem às quintas-feiras às 20h e aos domingos às 10h. Teremos um lugar especial reservado para você! Esperamos você! 🙌`;
     } else {
-      msg = `Olá ${firstName}! Lembra que conversamos na Igreja do Alto? Gostaria muito de te convidar para conhecer a nossa Casa do Alto (pequeno grupo de comunhão e oração) que acontece perto de onde você mora! É um momento muito gostoso de amizade e aprendizado da Palavra. Posso te passar os detalhes? Abraços! 🏠`;
+      msg = `Olá ${greetingName}! Lembra que conversamos na Igreja do Alto? Gostaria muito de te convidar para conhecer a nossa Casa do Alto (pequeno grupo de comunhão e oração) que acontece perto de onde você mora! É um momento muito gostoso de amizade e aprendizado da Palavra. Posso te passar os detalhes? Abraços! 🏠`;
     }
 
     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
     window.open(whatsappUrl, "_blank");
 
-    handleUpdateStatus(visitor.id, "mensagem_enviada");
     setWhatsappModalVisitor(null);
   };
 
@@ -2142,7 +2144,7 @@ export default function BemVindoPortalPage() {
                   {whatsappTemplate === "boas_vindas" && <Check className="w-4 h-4 text-emerald-600" />}
                 </div>
                 <p className="font-normal text-[11px] text-stone-500 mt-1">
-                  Agradecimento caloroso pela presença, pergunta sobre a experiência e oferta de oração.
+                  Mensagem padrão da Igreja do Alto com Linktree e horários dos cultos (Quinta 20h e Domingo 10h).
                 </p>
               </label>
 
@@ -2155,11 +2157,11 @@ export default function BemVindoPortalPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span>⛪ 2. Convite para o Próximo Domingo</span>
+                  <span>⛪ 2. Convite para o Próximo Culto</span>
                   {whatsappTemplate === "culto_proximo" && <Check className="w-4 h-4 text-emerald-600" />}
                 </div>
                 <p className="font-normal text-[11px] text-stone-500 mt-1">
-                  Convite acolhedor lembrando os horários (10h e 18h).
+                  Convite acolhedor lembrando os horários (Quinta às 20h e Domingo às 10h).
                 </p>
               </label>
 

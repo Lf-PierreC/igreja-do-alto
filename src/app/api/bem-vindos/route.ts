@@ -12,6 +12,7 @@ import { cleanDigits } from "@/lib/cpfUtils";
 import {
   FirstTimeVisitor,
   VisitorStatus,
+  VISITOR_STATUSES,
   BemVindosAccessRequest,
   BemVindosTeamMember,
   isMemberMinistryEligible,
@@ -389,14 +390,21 @@ export async function POST(request: Request) {
 
       const visitor = data.visitors[visitorIndex];
       const previousStatus = visitor.status;
+      if (previousStatus === newStatus && (!noteText || !noteText.trim())) {
+        return NextResponse.json({ ok: true, visitor });
+      }
+
       visitor.status = newStatus as VisitorStatus;
       visitor.updatedAt = new Date().toISOString();
 
       if (!visitor.notes) visitor.notes = [];
 
+      const prevLabel = VISITOR_STATUSES.find((s) => s.id === previousStatus)?.label || previousStatus;
+      const newLabel = VISITOR_STATUSES.find((s) => s.id === newStatus)?.label || newStatus;
+
       const logText = noteText && noteText.trim()
         ? noteText.trim()
-        : `Status alterado de "${previousStatus}" para "${newStatus}".`;
+        : `Status alterado de "${prevLabel}" para "${newLabel}".`;
 
       visitor.notes.unshift({
         id: `note-${Date.now()}`,
